@@ -1,0 +1,132 @@
+-- Create Database
+CREATE DATABASE ProjectManagementSystem;
+GO
+
+USE ProjectManagementSystem;
+GO
+
+-- ================================
+-- 1. USERS TABLE
+-- ================================
+CREATE TABLE Users (
+    user_id INT IDENTITY(1,1) PRIMARY KEY,
+    full_name NVARCHAR(100) NOT NULL,
+    email NVARCHAR(100) UNIQUE NOT NULL,
+    password NVARCHAR(255) NOT NULL,
+    role NVARCHAR(20) CHECK (role IN ('admin', 'leader', 'member')) NOT NULL,
+    created_at DATETIME DEFAULT GETDATE()
+);
+GO
+
+-- ================================
+-- 2. GROUPS TABLE
+-- ================================
+CREATE TABLE Groups (
+    group_id INT IDENTITY(1,1) PRIMARY KEY,
+    group_name NVARCHAR(100) NOT NULL,
+    created_by INT NOT NULL,
+    status NVARCHAR(20) CHECK (status IN ('pending', 'approved')) DEFAULT 'pending',
+    created_at DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (created_by) REFERENCES Users(user_id)
+);
+GO
+
+-- ================================
+-- 3. GROUP_MEMBERS TABLE
+-- ================================
+CREATE TABLE Group_Members (
+    member_id INT IDENTITY(1,1) PRIMARY KEY,
+    group_id INT NOT NULL,
+    user_id INT NOT NULL,
+    role_in_group NVARCHAR(20) CHECK (role_in_group IN ('leader', 'member')) NOT NULL,
+    joined_at DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (group_id) REFERENCES Groups(group_id),
+    FOREIGN KEY (user_id) REFERENCES Users(user_id)
+);
+GO
+
+-- ================================
+-- 4. PROJECTS TABLE
+-- ================================
+CREATE TABLE Projects (
+    project_id INT IDENTITY(1,1) PRIMARY KEY,
+    group_id INT NOT NULL,
+    title NVARCHAR(150) NOT NULL,
+    description NVARCHAR(MAX),
+    start_date DATE,
+    end_date DATE,
+    status NVARCHAR(20) CHECK (status IN ('ongoing', 'completed', 'delayed')) DEFAULT 'ongoing',
+    FOREIGN KEY (group_id) REFERENCES Groups(group_id)
+);
+GO
+
+-- ================================
+-- 5. TASKS TABLE
+-- ================================
+CREATE TABLE Tasks (
+    task_id INT IDENTITY(1,1) PRIMARY KEY,
+    project_id INT NOT NULL,
+    assigned_to INT NOT NULL,
+    task_title NVARCHAR(150) NOT NULL,
+    task_description NVARCHAR(MAX),
+    start_date DATE,
+    deadline DATE,
+    status NVARCHAR(20) CHECK (status IN ('pending', 'in_progress', 'completed', 'stuck')) DEFAULT 'pending',
+    progress INT DEFAULT 0,
+    created_at DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (project_id) REFERENCES Projects(project_id),
+    FOREIGN KEY (assigned_to) REFERENCES Users(user_id)
+);
+GO
+
+-- ================================
+-- 6. NOTIFICATIONS TABLE
+-- ================================
+CREATE TABLE Notifications (
+    notification_id INT IDENTITY(1,1) PRIMARY KEY,
+    user_id INT NOT NULL,
+    message NVARCHAR(255) NOT NULL,
+    is_read BIT DEFAULT 0,
+    created_at DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (user_id) REFERENCES Users(user_id)
+);
+GO
+
+-- ================================
+-- 7. REPORTS TABLE
+-- ================================
+CREATE TABLE Reports (
+    report_id INT IDENTITY(1,1) PRIMARY KEY,
+    project_id INT NOT NULL,
+    generated_by INT NOT NULL,
+    report_date DATETIME DEFAULT GETDATE(),
+    report_file NVARCHAR(255),
+    FOREIGN KEY (project_id) REFERENCES Projects(project_id),
+    FOREIGN KEY (generated_by) REFERENCES Users(user_id)
+);
+GO
+
+-- ================================
+-- 8. ISSUES TABLE
+-- ================================
+CREATE TABLE Issues (
+    issue_id INT IDENTITY(1,1) PRIMARY KEY,
+    task_id INT NOT NULL,
+    reported_by INT NOT NULL,
+    description NVARCHAR(MAX) NOT NULL,
+    status NVARCHAR(20) CHECK (status IN ('open', 'resolved')) DEFAULT 'open',
+    created_at DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (task_id) REFERENCES Tasks(task_id),
+    FOREIGN KEY (reported_by) REFERENCES Users(user_id)
+);
+GO
+
+-- ================================
+-- ✅ SAMPLE INSERTS (optional)
+-- ================================
+INSERT INTO Users (full_name, email, password, role)
+VALUES 
+('Admin User', 'admin@example.com', 'admin123', 'admin'),
+('Leader User', 'leader@example.com', 'leader123', 'leader'),
+('Member User', 'member@example.com', 'member123', 'member');
+GO
