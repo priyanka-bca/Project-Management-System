@@ -1,0 +1,30 @@
+{
+  "name": "project-management-system",
+  "version": "1.0.0",
+  "description": "A Project Management System developed as part of my final year college project. This system is designed to help teams and organizations plan, track, and manage projects efficiently.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib"
+  },
+  "scripts": {
+  "start": "node index.js",
+     "dev": "nodemon index.js",
+      "test": "echo \"Error: no test specified\" && exit 1"
+
+  
+},
+
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/priyanka-bca/Project-Management-System.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/priyanka-bca/Project-Management-System/issues"
+  },
+  "homepage": "https://github.com/priyanka-bca/Project-Management-System#readme"
+}
