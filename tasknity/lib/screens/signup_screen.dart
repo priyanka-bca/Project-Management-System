@@ -12,14 +12,26 @@ class _SignupScreenState extends State<SignupScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  bool _obscurePassword = true; // Added toggle for password visibility
+
   void _signup() {
     if (_nameController.text.isEmpty ||
         _emailController.text.isEmpty ||
         _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields')),
+      );
       return;
     }
+
+    // Minor improvement: simple validation for email
+    if (!_emailController.text.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid email')),
+      );
+      return;
+    }
+
     Navigator.pushReplacementNamed(context, '/login');
   }
 
@@ -36,24 +48,47 @@ class _SignupScreenState extends State<SignupScreen> {
               children: [
                 TextField(
                   controller: _nameController,
-                  decoration:
-                      const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _emailController,
-                  decoration:
-                      const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+                  keyboardType: TextInputType.emailAddress, // Slight improvement
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
                   controller: _passwordController,
-                  obscureText: true,
-                  decoration:
-                      const InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
+                  obscureText: _obscurePassword, // Use toggle
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton(onPressed: _signup, child: const Text('Sign Up')),
+                SizedBox(
+                  width: double.infinity, // Full-width button
+                  child: ElevatedButton(
+                    onPressed: _signup,
+                    child: const Text('Sign Up'),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
@@ -67,4 +102,4 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 }
-  
+
