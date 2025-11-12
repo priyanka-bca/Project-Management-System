@@ -2,9 +2,9 @@ import React, { useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import TaskCard from "./TaskCard";
 
-export default function TaskBoard({ role, addTask, updateTask, tasks, groups }) {
+export default function TaskBoard({ role, tasks, groups, addTask, updateTask }) {
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [desc, setDesc] = useState("");
   const [groupId, setGroupId] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -16,92 +16,129 @@ export default function TaskBoard({ role, addTask, updateTask, tasks, groups }) 
     const newTask = {
       id: uuidv4(),
       title,
-      description,
+      description: desc,
       groupId,
       assignedTo,
-      status: "todo",
       deadline,
+      status: "pending",
     };
-
     addTask(newTask);
+
+    // reset
     setTitle("");
-    setDescription("");
+    setDesc("");
     setGroupId("");
     setAssignedTo("");
     setDeadline("");
   };
 
-  // filter tasks for selected group (leaders/members)
-  const visibleTasks =
-    role === "admin"
-      ? tasks
-      : tasks.filter((t) =>
-          groups.some(
-            (g) =>
-              g.id === t.groupId &&
-              ((role === "leader" && g.leaderId === assignedTo) ||
-                (role === "member" && g.members.includes(assignedTo)))
-          )
-        );
+  const filteredTasks =
+    role === "leader" || role === "member"
+      ? tasks.filter((t) =>
+          groups.some((g) => g.id === t.groupId && g.leaderId === assignedTo)
+        )
+      : tasks;
 
   return (
-    <main>
-      <div className="card">
-        <h3>Task Board</h3>
+    <main className="max-w-5xl mx-auto p-6 space-y-8">
+      <h2 className="text-2xl font-bold text-gray-800 border-b pb-2">
+        Task Board
+      </h2>
 
-        {role !== "member" && (
-          <form onSubmit={handleAddTask} className="add-task-form">
-            <input
-              placeholder="Task title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-            <textarea
-              placeholder="Description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-            <label>Group:</label>
-            <select
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              required
-            >
-              <option value="">Select Group</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
+      {role === "admin" || role === "leader" ? (
+        <form
+          onSubmit={handleAddTask}
+          className="bg-white p-4 shadow border rounded-md space-y-4"
+        >
+          <h3 className="text-lg font-semibold text-gray-700">
+            Add New Task
+          </h3>
 
-            <label>Assign To:</label>
-            <input
-              placeholder="Member name"
-              value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
-            />
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Task title</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="border rounded p-2"
+                placeholder="Enter task title"
+                required
+              />
+            </div>
 
-            <label>Deadline:</label>
-            <input
-              type="date"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
-            />
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Description</label>
+              <input
+                type="text"
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+                className="border rounded p-2"
+                placeholder="Brief task details"
+              />
+            </div>
 
-            <button type="submit">➕ Add Task</button>
-          </form>
-        )}
-      </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Group</label>
+              <select
+                value={groupId}
+                onChange={(e) => setGroupId(e.target.value)}
+                className="border rounded p-2"
+                required
+              >
+                <option value="">Select group</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-      <div className="task-list">
-        {tasks.length === 0 ? (
-          <p>No tasks available.</p>
-        ) : (
-          tasks.map((task) => (
-            <TaskCard key={task.id} task={task} updateTask={updateTask} role={role} />
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Assign To</label>
+              <input
+                type="text"
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                className="border rounded p-2"
+                placeholder="Member name"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium">Deadline</label>
+              <input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                className="border rounded p-2"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+          >
+            Add Task
+          </button>
+        </form>
+      ) : (
+        <p className="text-center text-gray-600">
+          Only Admins or Leaders can add new tasks.
+        </p>
+      )}
+
+      <div className="grid md:grid-cols-3 gap-4 mt-6">
+        {filteredTasks.length > 0 ? (
+          filteredTasks.map((task) => (
+            <TaskCard key={task.id} task={task} updateTask={updateTask} />
           ))
+        ) : (
+          <p className="text-gray-500 col-span-3 text-center">
+            No tasks available.
+          </p>
         )}
       </div>
     </main>

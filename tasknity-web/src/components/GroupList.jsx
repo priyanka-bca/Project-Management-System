@@ -1,56 +1,101 @@
 import React from "react";
+import toast from "react-hot-toast";
+import { motion, AnimatePresence } from "framer-motion";
 
-export default function GroupList({ groups, approveGroup, assignLeader, role }) {
+export default function GroupList({ groups, approveGroup, assignLeader }) {
+  if (!groups.length)
+    return (
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="text-gray-600 text-center"
+      >
+        No groups created yet.
+      </motion.p>
+    );
+
   return (
-    <div className="card">
-      <h3>Group List</h3>
-      {groups.length === 0 ? (
-        <p>No groups created yet.</p>
-      ) : (
-        groups.map((group) => (
-          <div key={group.id} className="group-item">
-            <h4>
-              {group.name}{" "}
-              {group.approved ? (
-                <span className="status approved">✔ Approved</span>
-              ) : (
-                <span className="status pending">⏳ Pending</span>
-              )}
-            </h4>
+    <div className="bg-white p-4 shadow rounded-md border">
+      <h3 className="text-lg font-semibold text-gray-700 mb-4">
+        Existing Groups
+      </h3>
 
-            <p>
-              <strong>Members:</strong> {group.members.join(", ")}
-            </p>
+      <ul className="space-y-4">
+        <AnimatePresence>
+          {groups.map((g) => (
+            <motion.li
+              key={g.id}
+              layout
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="p-4 border rounded-md bg-gray-50 shadow-sm hover:shadow-md transition"
+            >
+              <div className="flex justify-between items-center">
+                <p className="font-semibold text-gray-800">
+                  {g.name}{" "}
+                  {g.approved ? (
+                    <span className="text-green-600 text-sm">(Approved)</span>
+                  ) : (
+                    <span className="text-yellow-600 text-sm">(Pending)</span>
+                  )}
+                </p>
+              </div>
 
-            {group.leaderId && (
-              <p>
-                <strong>Leader:</strong> {group.leaderId}
+              <p className="text-sm text-gray-600">
+                Members: {g.members.join(", ") || "None"}
               </p>
-            )}
 
-            {role === "admin" && !group.approved && (
-              <button onClick={() => approveGroup(group.id)}>Approve Group</button>
-            )}
+              <div className="flex gap-3 mt-3">
+                {!g.approved && (
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      approveGroup(g.id);
+                      toast.success(`✅ "${g.name}" has been approved!`);
+                    }}
+                    className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-sm transition"
+                  >
+                    Approve
+                  </motion.button>
+                )}
 
-            {role === "admin" && group.approved && (
-              <div className="leader-select">
-                <label>Assign Leader:</label>
                 <select
-                  value={group.leaderId}
-                  onChange={(e) => assignLeader(group.id, e.target.value)}
+                  onChange={(e) => {
+                    assignLeader(g.id, e.target.value);
+                    if (e.target.value) {
+                      toast(`👑 ${e.target.value} assigned as leader of "${g.name}"`, {
+                        icon: "🎯",
+                      });
+                    }
+                  }}
+                  className="border p-1 rounded text-sm"
+                  defaultValue={g.leaderId || ""}
                 >
-                  <option value="">Select</option>
-                  {group.members.map((m) => (
+                  <option value="">Assign Leader</option>
+                  {g.members.map((m) => (
                     <option key={m} value={m}>
                       {m}
                     </option>
                   ))}
                 </select>
               </div>
-            )}
-          </div>
-        ))
-      )}
+
+              {g.leaderId && (
+                <p className="text-sm text-gray-700 mt-2">
+                  Leader:{" "}
+                  <span className="font-medium text-blue-700">
+                    {g.leaderId}
+                  </span>
+                </p>
+              )}
+            </motion.li>
+          ))}
+        </AnimatePresence>
+      </ul>
     </div>
   );
 }
