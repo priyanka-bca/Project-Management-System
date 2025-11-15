@@ -17,7 +17,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       "tasks": [
         {"title": "Design new logo", "status": "In Progress"},
         {"title": "Prepare color palette", "status": "Pending"},
-      ]
+      ],
     },
     {
       "id": 2,
@@ -26,77 +26,76 @@ class _DashboardScreenState extends State<DashboardScreen> {
       "tasks": [
         {"title": "Set up database schema", "status": "Done"},
         {"title": "Build login screen", "status": "In Progress"},
-      ]
-    }
+      ],
+    },
   ];
 
   void _signOut() {
     Navigator.pushReplacementNamed(context, '/login');
   }
 
-void _addGroupDialog() {
-  final nameController = TextEditingController();
-  final descController = TextEditingController();
+  void _addGroupDialog() {
+    final nameController = TextEditingController();
+    final descController = TextEditingController();
 
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: const Text('Add New Group'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: nameController,
-            decoration: const InputDecoration(
-              labelText: 'Group name',
-              border: OutlineInputBorder(),
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Add New Group'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Group name',
+                border: OutlineInputBorder(),
+              ),
             ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descController,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: descController,
-            decoration: const InputDecoration(
-              labelText: 'Description',
-              border: OutlineInputBorder(),
-            ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameController.text.trim().isEmpty) return;
+
+              setState(() {
+                groups.add({
+                  "id": DateTime.now().millisecondsSinceEpoch,
+                  "name": nameController.text.trim(),
+                  "description": descController.text.trim(),
+                  "tasks": [],
+                });
+              });
+
+              Navigator.pop(context); // close dialog
+
+              // SnackBar to show group added
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Group "${nameController.text}" added!'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            child: const Text('Add'),
           ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            if (nameController.text.trim().isEmpty) return;
-
-            setState(() {
-              groups.add({
-                "id": DateTime.now().millisecondsSinceEpoch,
-                "name": nameController.text.trim(),
-                "description": descController.text.trim(),
-                "tasks": []
-              });
-            });
-
-            Navigator.pop(context); // close dialog
-
-            // SnackBar to show group added
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Group "${nameController.text}" added!'),
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          },
-          child: const Text('Add'),
-        ),
-      ],
-    ),
-  );
-}
-
+    );
+  }
 
   void _addTaskDialog(Map<String, dynamic> group) {
     final titleController = TextEditingController();
@@ -112,17 +111,23 @@ void _addGroupDialog() {
             TextField(
               controller: titleController,
               decoration: const InputDecoration(
-                  labelText: 'Task title', border: OutlineInputBorder()),
+                labelText: 'Task title',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: selectedStatus,
+              initialValue: selectedStatus,
               decoration: const InputDecoration(
-                  labelText: 'Status', border: OutlineInputBorder()),
+                labelText: 'Status',
+                border: OutlineInputBorder(),
+              ),
               items: const [
                 DropdownMenuItem(value: "Pending", child: Text("Pending")),
                 DropdownMenuItem(
-                    value: "In Progress", child: Text("In Progress")),
+                  value: "In Progress",
+                  child: Text("In Progress"),
+                ),
                 DropdownMenuItem(value: "Done", child: Text("Done")),
               ],
               onChanged: (value) {
@@ -133,20 +138,22 @@ void _addGroupDialog() {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-              onPressed: () {
-                if (titleController.text.trim().isEmpty) return;
-                setState(() {
-                  group["tasks"].add({
-                    "title": titleController.text.trim(),
-                    "status": selectedStatus
-                  });
+            onPressed: () {
+              if (titleController.text.trim().isEmpty) return;
+              setState(() {
+                group["tasks"].add({
+                  "title": titleController.text.trim(),
+                  "status": selectedStatus,
                 });
-                Navigator.pop(context);
-              },
-              child: const Text('Add Task'))
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('Add Task'),
+          ),
         ],
       ),
     );
@@ -179,10 +186,13 @@ void _addGroupDialog() {
                           },
                           itemBuilder: (_) => const [
                             PopupMenuItem(
-                                value: "Pending", child: Text("Pending")),
+                              value: "Pending",
+                              child: Text("Pending"),
+                            ),
                             PopupMenuItem(
-                                value: "In Progress",
-                                child: Text("In Progress")),
+                              value: "In Progress",
+                              child: Text("In Progress"),
+                            ),
                             PopupMenuItem(value: "Done", child: Text("Done")),
                           ],
                           child: const Icon(Icons.more_vert),
@@ -194,14 +204,16 @@ void _addGroupDialog() {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
           ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _addTaskDialog(group);
-              },
-              child: const Text('Add Task')),
+            onPressed: () {
+              Navigator.pop(context);
+              _addTaskDialog(group);
+            },
+            child: const Text('Add Task'),
+          ),
         ],
       ),
     );
@@ -211,11 +223,11 @@ void _addGroupDialog() {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-  title: const Text('Tasknity Dashboard 📝'), // added emoji
-  actions: [
-    IconButton(onPressed: _signOut, icon: const Icon(Icons.logout)),
-  ],
-),
+        title: const Text('Tasknity Dashboard 📝'), // added emoji
+        actions: [
+          IconButton(onPressed: _signOut, icon: const Icon(Icons.logout)),
+        ],
+      ),
       body: ListView.builder(
         itemCount: groups.length,
         itemBuilder: (context, i) {
@@ -224,7 +236,9 @@ void _addGroupDialog() {
             margin: const EdgeInsets.all(10),
             child: ListTile(
               title: Text(g["name"]),
-             subtitle: Text('${g["description"]} • ${g["tasks"].length} tasks'),
+              subtitle: Text(
+                '${g["description"]} • ${g["tasks"].length} tasks',
+              ),
               trailing: IconButton(
                 icon: const Icon(Icons.visibility),
                 onPressed: () => _viewTasksDialog(g),
@@ -235,12 +249,11 @@ void _addGroupDialog() {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
-  onPressed: _addGroupDialog,
-  label: const Text('Add Group'),
-  icon: const Icon(Icons.add),
-  tooltip: 'Click to create a new group', // added tooltip
-),
-
+        onPressed: _addGroupDialog,
+        label: const Text('Add Group'),
+        icon: const Icon(Icons.add),
+        tooltip: 'Click to create a new group', // added tooltip
+      ),
     );
   }
 }
