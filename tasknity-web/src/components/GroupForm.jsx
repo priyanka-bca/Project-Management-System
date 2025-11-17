@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { v4 as uuidv4 } from "uuid";
+import toast from "react-hot-toast";
 
 export default function GroupForm({ addGroup }) {
   const [groupName, setGroupName] = useState("");
@@ -7,17 +7,25 @@ export default function GroupForm({ addGroup }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!groupName.trim()) return;
+
+    if (!groupName.trim()) {
+      toast.error("Group name cannot be empty");
+      return;
+    }
 
     const newGroup = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       name: groupName,
-      members: members.split(",").map((m) => m.trim()),
-      leaderId: "",
+      members: members
+        ? members.split(",").map((m) => m.trim())
+        : [],
       approved: false,
+      leaderId: "",
     };
 
     addGroup(newGroup);
+    toast.success(`Group "${groupName}" created successfully!`);
+
     setGroupName("");
     setMembers("");
   };
@@ -25,38 +33,42 @@ export default function GroupForm({ addGroup }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white shadow p-4 rounded-md space-y-4 border"
+      className="bg-white p-6 rounded-lg shadow border space-y-4"
     >
-      <h3 className="text-lg font-semibold text-gray-700">Create New Group</h3>
+      <h3 className="text-xl font-semibold text-gray-700">
+        Create New Group
+      </h3>
 
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium">Group Name</label>
+      <div>
+        <label className="text-sm font-medium text-gray-600">Group Name *</label>
         <input
           type="text"
+          className="w-full p-2 border rounded mt-1"
           value={groupName}
           onChange={(e) => setGroupName(e.target.value)}
-          className="border rounded p-2"
           placeholder="Enter group name"
           required
         />
       </div>
 
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium">Members (comma separated)</label>
+      <div>
+        <label className="text-sm font-medium text-gray-600">
+          Members (comma separated)
+        </label>
         <input
           type="text"
+          className="w-full p-2 border rounded mt-1"
           value={members}
           onChange={(e) => setMembers(e.target.value)}
-          className="border rounded p-2"
-          placeholder="e.g. Alice, Bob, Charlie"
+          placeholder="e.g. John, Sara, Peter"
         />
       </div>
 
       <button
         type="submit"
-        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+        className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 transition"
       >
-        Add Group
+        + Create Group
       </button>
     </form>
   );

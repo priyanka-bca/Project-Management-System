@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { Toaster } from "react-hot-toast";
 import Header from './components/Header';
 import AdminPanel from './components/AdminPanel';
@@ -7,6 +7,7 @@ import TaskBoard from './components/TaskBoard';
 import Reports from './components/Reports';
 import RoleSwitcher from './components/RoleSwitcher';
 import LeaderMemberDashboard from './components/LeaderMemberDashboard';
+import AdminNavbar from "./components/AdminNavbar";
 import { loadState, saveState } from './utils/storage';
 import { initialState } from './data/mockData';
 
@@ -50,6 +51,7 @@ export default function App() {
   return (
     <div className="app">
       <Header />
+
       <Toaster
         position="top-right"
         toastOptions={{
@@ -60,17 +62,14 @@ export default function App() {
             fontSize: "14px",
             boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
           },
-          success: {
-            iconTheme: { primary: "#16a34a", secondary: "#fff" },
-          },
         }}
       />
-      <nav className="navbar">
-        <Link to="/">Admin</Link>
-        <Link to="/board">Task Board</Link>
-        <Link to="/reports">Reports</Link>
-      </nav>
+
+      {/* Show navbar only when Admin role */}
+      {role === "admin" && <AdminNavbar />}
+
       <RoleSwitcher role={role} setRole={setRole} />
+
       <Routes>
         <Route
           path="/"
@@ -94,6 +93,7 @@ export default function App() {
             )
           }
         />
+
         <Route
           path="/board"
           element={
@@ -106,9 +106,17 @@ export default function App() {
             />
           }
         />
-        <Route path="/reports" element={<Reports state={state} />} />
-      </Routes>
 
+        <Route
+          path="/reports"
+          element={
+            <Reports
+              tasks={state.tasks}
+              groups={state.groups}
+            />
+          }
+        />
+      </Routes>
     </div>
   );
 }
