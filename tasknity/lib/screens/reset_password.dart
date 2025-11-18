@@ -9,7 +9,10 @@ class ResetPasswordScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      appBar: AppBar(title: const Text("Reset Password"), centerTitle: true),
+      appBar: AppBar(
+        title: const Text("Reset Password"),
+        centerTitle: true,
+      ),
       body: Padding(
         padding: const EdgeInsets.all(25.0),
         child: Column(
@@ -20,7 +23,9 @@ class ResetPasswordScreen extends StatelessWidget {
               style: TextStyle(fontSize: 16, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
+
             const SizedBox(height: 25),
+
             TextField(
               controller: emailController,
               decoration: const InputDecoration(
@@ -31,7 +36,9 @@ class ResetPasswordScreen extends StatelessWidget {
                 ),
               ),
             ),
+
             const SizedBox(height: 25),
+
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),

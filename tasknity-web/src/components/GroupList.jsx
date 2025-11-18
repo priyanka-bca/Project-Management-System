@@ -1,56 +1,76 @@
 import React from "react";
+import toast from "react-hot-toast";
 
-export default function GroupList({ groups, approveGroup, assignLeader, role }) {
+export default function GroupList({ groups, approveGroup, assignLeader }) {
+  if (!groups.length) {
+    return (
+      <p className="text-gray-600 bg-white p-4 rounded-lg border shadow">
+        No groups created yet.
+      </p>
+    );
+  }
+
   return (
-    <div className="card">
-      <h3>Group List</h3>
-      {groups.length === 0 ? (
-        <p>No groups created yet.</p>
-      ) : (
-        groups.map((group) => (
-          <div key={group.id} className="group-item">
-            <h4>
-              {group.name}{" "}
-              {group.approved ? (
-                <span className="status approved">✔ Approved</span>
-              ) : (
-                <span className="status pending">⏳ Pending</span>
-              )}
-            </h4>
+    <div className="bg-white p-6 rounded-lg shadow border space-y-4">
+      <h3 className="text-xl font-semibold text-gray-700 mb-3">
+        Existing Groups
+      </h3>
 
-            <p>
-              <strong>Members:</strong> {group.members.join(", ")}
-            </p>
+      {groups.map((g) => (
+        <div
+          key={g.id}
+          className="p-4 border rounded-lg bg-gray-50 shadow-sm"
+        >
+          <p className="text-lg font-semibold text-gray-800">
+            {g.name}{" "}
+            {g.approved ? (
+              <span className="text-green-600 text-sm">(Approved)</span>
+            ) : (
+              <span className="text-yellow-600 text-sm">(Pending)</span>
+            )}
+          </p>
 
-            {group.leaderId && (
-              <p>
-                <strong>Leader:</strong> {group.leaderId}
-              </p>
+          <p className="text-sm text-gray-600 mt-1">
+            Members: {g.members.join(", ") || "No members"}
+          </p>
+
+          <div className="flex gap-4 mt-3">
+            {!g.approved && (
+              <button
+                onClick={() => {
+                  approveGroup(g.id);
+                  toast.success(`Group "${g.name}" approved!`);
+                }}
+                className="bg-green-600 text-white px-3 py-1 rounded"
+              >
+                Approve
+              </button>
             )}
 
-            {role === "admin" && !group.approved && (
-              <button onClick={() => approveGroup(group.id)}>Approve Group</button>
-            )}
-
-            {role === "admin" && group.approved && (
-              <div className="leader-select">
-                <label>Assign Leader:</label>
-                <select
-                  value={group.leaderId}
-                  onChange={(e) => assignLeader(group.id, e.target.value)}
-                >
-                  <option value="">Select</option>
-                  {group.members.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <select
+              defaultValue={g.leaderId || ""}
+              onChange={(e) => {
+                assignLeader(g.id, e.target.value);
+                toast.success(`Leader assigned to ${g.name}`);
+              }}
+              className="border rounded p-1"
+            >
+              <option value="">Assign Leader</option>
+              {g.members.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
           </div>
-        ))
-      )}
+
+          {g.leaderId && (
+            <p className="text-sm text-gray-700 mt-2">
+              Leader: <span className="font-medium">{g.leaderId}</span>
+            </p>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

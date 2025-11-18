@@ -16,12 +16,20 @@ class _SignupScreenState extends State<SignupScreen> {
     if (_nameController.text.isEmpty ||
         _emailController.text.isEmpty ||
         _passwordController.text.isEmpty) {
+<<<<<<< HEAD
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all fields')),
       );
       return;
     }
 
+=======
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+      return;
+    }
+>>>>>>> bd6649dd7883fe54992c0c8309152474b093d67e
     Navigator.pushReplacementNamed(context, '/login');
   }
 

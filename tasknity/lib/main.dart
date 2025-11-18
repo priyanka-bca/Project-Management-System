@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:tasknity/screens/reset_password.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -16,13 +15,15 @@ class TasknityApp extends StatelessWidget {
     return MaterialApp(
       title: 'Tasknity Web',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.indigo, useMaterial3: true),
+      theme: ThemeData(
+        primarySwatch: Colors.indigo,
+        useMaterial3: true,
+      ),
       initialRoute: '/login',
       routes: {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
         '/dashboard': (context) => const DashboardScreen(),
-        '/resetpassword': (context) => const ResetPasswordScreen(),
       },
     );
   }
