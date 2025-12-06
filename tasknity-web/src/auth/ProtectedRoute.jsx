@@ -1,9 +1,8 @@
+// src/components/ProtectedRoute.jsx
+import React from "react";
 import { Navigate } from "react-router-dom";
-import { supabase } from "../supabase";
 
-export default function ProtectedRoute({ children }) {
-  const session = supabase.auth.getSession();
-
-  if (!session) return <Navigate to="/login" />;
+export default function ProtectedRoute({ session, children }) {
+  if (!session) return <Navigate to="/auth/login" replace />;
   return children;
 }

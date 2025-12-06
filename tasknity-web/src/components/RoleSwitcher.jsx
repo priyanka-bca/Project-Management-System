@@ -1,4 +1,7 @@
-export default function RoleSwitcher({ role, setRole }) {
+export default function RoleSwitcher({ }) {
+const [role, setRole] = useState(profile.role);
+
+
   return (
     <div className="role-switcher flex justify-center gap-2 my-4">
       <label className="font-medium">Current Role:</label>
