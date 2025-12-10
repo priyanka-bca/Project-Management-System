@@ -16,14 +16,11 @@ class TasknityApp extends StatelessWidget {
     return MaterialApp(
       title: 'Tasknity',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.indigo,
-        useMaterial3: true,
-      ),
+      theme: ThemeData(primarySwatch: Colors.indigo, useMaterial3: true),
       initialRoute: '/login',
       routes: {
-        '/login': (context) => const LoginScreen(),
-        '/signup': (context) => const SignupScreen(),
+        // '/login': (context) => const LoginScreen(),
+        // '/signup': (context) => const SignupScreen(),
         '/dashboard': (context) => const DashboardScreen(),
       },
     );
