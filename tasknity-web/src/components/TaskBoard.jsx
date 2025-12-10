@@ -1,146 +1,201 @@
 import React, { useState } from "react";
-import { v4 as uuidv4 } from "uuid";
+import { motion } from "framer-motion";
 import TaskCard from "./TaskCard";
+import { v4 as uuidv4 } from "uuid";
+import toast from "react-hot-toast";
 
 export default function TaskBoard({ role, tasks, groups, addTask, updateTask }) {
-  const [title, setTitle] = useState("");
-  const [desc, setDesc] = useState("");
-  const [groupId, setGroupId] = useState("");
-  const [assignedTo, setAssignedTo] = useState("");
-  const [deadline, setDeadline] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    groupId: "",
+    assignedTo: "",
+    deadline: "",
+  });
 
-  const handleAddTask = (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (!title.trim() || !groupId) return;
 
-    const newTask = {
+    if (!formData.title || !formData.groupId) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    addTask({
       id: uuidv4(),
-      title,
-      description: desc,
-      groupId,
-      assignedTo,
-      deadline,
+      ...formData,
       status: "pending",
-    };
-    addTask(newTask);
+    });
 
-    // reset
-    setTitle("");
-    setDesc("");
-    setGroupId("");
-    setAssignedTo("");
-    setDeadline("");
+    toast.success("Task created successfully! 🎉");
+
+    setFormData({
+      title: "",
+      description: "",
+      groupId: "",
+      assignedTo: "",
+      deadline: "",
+    });
+    setShowForm(false);
   };
 
-  const filteredTasks =
-    role === "leader" || role === "member"
-      ? tasks.filter((t) =>
-          groups.some((g) => g.id === t.groupId && g.leaderId === assignedTo)
-        )
-      : tasks;
+  const groupedTasks = {
+    pending: tasks.filter((t) => t.status === "pending"),
+    inProgress: tasks.filter((t) => t.status === "in-progress"),
+    completed: tasks.filter((t) => t.status === "completed"),
+  };
 
   return (
-    <main className="max-w-5xl mx-auto p-6 space-y-8">
-      <h2 className="text-2xl font-bold text-gray-800 border-b pb-2">
-        Task Board
-      </h2>
+    <main className="max-w-7xl mx-auto p-6 space-y-8">
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-bold text-gray-800">Task Board</h2>
 
-      {role === "admin" || role === "leader" ? (
-        <form
-          onSubmit={handleAddTask}
-          className="bg-white p-4 shadow border rounded-md space-y-4"
+        {(role === "admin" || role === "leader") && (
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowForm(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+          >
+            + Add Task
+          </motion.button>
+        )}
+      </div>
+
+      {/* New Clean Column Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* PENDING */}
+        <TaskColumn
+          title="Pending Tasks"
+          color="border-yellow-500"
+          tasks={groupedTasks.pending}
+          updateTask={updateTask}
+        />
+
+        {/* IN PROGRESS */}
+        <TaskColumn
+          title="In Progress"
+          color="border-blue-500"
+          tasks={groupedTasks.inProgress}
+          updateTask={updateTask}
+        />
+
+        {/* COMPLETED */}
+        <TaskColumn
+          title="Completed"
+          color="border-green-600"
+          tasks={groupedTasks.completed}
+          updateTask={updateTask}
+        />
+      </div>
+
+      {/* Add Task Modal */}
+      {showForm && (
+        <motion.div
+          className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
         >
-          <h3 className="text-lg font-semibold text-gray-700">
-            Add New Task
-          </h3>
+          <motion.div
+            className="bg-white rounded-lg p-6 w-96 shadow-xl"
+            initial={{ scale: 0.8 }}
+            animate={{ scale: 1 }}
+          >
+            <h3 className="text-lg font-bold mb-4">Create New Task</h3>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Task title</label>
+            <form onSubmit={handleSubmit} className="space-y-3">
               <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="border rounded p-2"
-                placeholder="Enter task title"
+                className="w-full p-2 border rounded"
+                placeholder="Task Title *"
+                value={formData.title}
+                onChange={(e) =>
+                  setFormData({ ...formData, title: e.target.value })
+                }
                 required
               />
-            </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Description</label>
-              <input
-                type="text"
-                value={desc}
-                onChange={(e) => setDesc(e.target.value)}
-                className="border rounded p-2"
-                placeholder="Brief task details"
+              <textarea
+                className="w-full p-2 border rounded"
+                placeholder="Description"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({ ...formData, description: e.target.value })
+                }
               />
-            </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Group</label>
               <select
-                value={groupId}
-                onChange={(e) => setGroupId(e.target.value)}
-                className="border rounded p-2"
+                className="w-full p-2 border rounded"
+                value={formData.groupId}
+                onChange={(e) =>
+                  setFormData({ ...formData, groupId: e.target.value })
+                }
                 required
               >
-                <option value="">Select group</option>
+                <option value="">Select Group *</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
                   </option>
                 ))}
               </select>
-            </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Assign To</label>
               <input
-                type="text"
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                className="border rounded p-2"
-                placeholder="Member name"
+                className="w-full p-2 border rounded"
+                placeholder="Assign To (optional)"
+                value={formData.assignedTo}
+                onChange={(e) =>
+                  setFormData({ ...formData, assignedTo: e.target.value })
+                }
               />
-            </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium">Deadline</label>
               <input
                 type="date"
-                value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
-                className="border rounded p-2"
+                className="w-full p-2 border rounded"
+                value={formData.deadline}
+                onChange={(e) =>
+                  setFormData({ ...formData, deadline: e.target.value })
+                }
               />
-            </div>
-          </div>
 
-          <button
-            type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
-          >
-            Add Task
-          </button>
-        </form>
-      ) : (
-        <p className="text-center text-gray-600">
-          Only Admins or Leaders can add new tasks.
-        </p>
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowForm(false)}
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Save Task
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </motion.div>
       )}
+    </main>
+  );
+}
 
-      <div className="grid md:grid-cols-3 gap-4 mt-6">
-        {filteredTasks.length > 0 ? (
-          filteredTasks.map((task) => (
+// Reusable Column Component
+function TaskColumn({ title, color, tasks, updateTask }) {
+  return (
+    <div className={`bg-white rounded-lg shadow p-4 border-t-4 ${color}`}>
+      <h3 className="text-xl font-semibold mb-3">{title}</h3>
+
+      <div className="space-y-4">
+        {tasks.length > 0 ? (
+          tasks.map((task) => (
             <TaskCard key={task.id} task={task} updateTask={updateTask} />
           ))
         ) : (
-          <p className="text-gray-500 col-span-3 text-center">
-            No tasks available.
-          </p>
+          <p className="text-gray-500 text-sm">No tasks here yet.</p>
         )}
       </div>
-    </main>
+    </div>
   );
 }
