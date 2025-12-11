@@ -1,119 +1,163 @@
-import React, { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
+// src/App.jsx
+import React, { useEffect, useState } from "react";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import Header from './components/Header';
-import AdminPanel from './components/AdminPanel';
-import TaskBoard from './components/TaskBoard';
-import Reports from './components/Reports';
-import RoleSwitcher from './components/RoleSwitcher';
-import LeaderMemberDashboard from './components/LeaderMemberDashboard';
+
+import Header from "./components/Header";
 import AdminNavbar from "./components/AdminNavbar";
-import { loadState, saveState } from './utils/storage';
-import { initialState } from './data/mockData';
+import AdminPanel from "./components/AdminPanel";
+import TaskBoard from "./components/TaskBoard";
+import Reports from "./components/Reports";
+import LeaderMemberDashboard from "./components/LeaderMemberDashboard";
+
+import AdminLogin from "./auth/AdminLogin";
+import Login from "./auth/Login";
+import Signup from "./auth/Signup";
+import ForgotPassword from "./auth/ForgotPassword";
+
+import { supabase } from "./supabase";
+import ProtectedRoute from "./auth/ProtectedRoute";
+
+import { loadState, saveState } from "./utils/storage";
+import { initialState } from "./data/mockData";
 
 export default function App() {
   const [state, setState] = useState(() => loadState() || initialState);
-  const [role, setRole] = useState('admin');
 
+  // For users (Supabase)
+  const [session, setSession] = useState(null);
+
+  // For Admin Login
+  const [isAdmin, setIsAdmin] = useState(
+    localStorage.getItem("isAdmin") === "true"
+  );
+
+  // Save data in localStorage
+  useEffect(() => saveState(state), [state]);
+
+  // Track Supabase login session
   useEffect(() => {
-    saveState(state);
-  }, [state]);
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+    });
 
-  const addGroup = (group) => {
-    setState((prev) => ({ ...prev, groups: [...prev.groups, group] }));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  // CRUD Handlers
+  const addGroup = (group) => setState((p) => ({ ...p, groups: [...p.groups, group] }));
+  const approveGroup = (id) => setState((p) => ({ ...p, groups: p.groups.map(g => g.id === id ? { ...g, approved: true } : g) }));
+  const assignLeader = (groupId, leaderId) => setState((p) => ({ ...p, groups: p.groups.map(g => g.id === groupId ? { ...g, leaderId } : g) }));
+  const addTask = (task) => setState((p) => ({ ...p, tasks: [...p.tasks, task] }));
+  const updateTask = (id, patch) => setState((p) => ({ ...p, tasks: p.tasks.map(t => t.id === id ? { ...t, ...patch } : t) }));
+
+  const handleAdminLoginSuccess = () => {
+    setIsAdmin(true);
+    localStorage.setItem("isAdmin", "true");
   };
 
-  const approveGroup = (id) => {
-    setState((prev) => ({
-      ...prev,
-      groups: prev.groups.map((g) => (g.id === id ? { ...g, approved: true } : g)),
-    }));
-  };
-
-  const assignLeader = (groupId, leaderId) => {
-    setState((prev) => ({
-      ...prev,
-      groups: prev.groups.map((g) => (g.id === groupId ? { ...g, leaderId } : g)),
-    }));
-  };
-
-  const addTask = (task) => {
-    setState((prev) => ({ ...prev, tasks: [...prev.tasks, task] }));
-  };
-
-  const updateTask = (id, patch) => {
-    setState((prev) => ({
-      ...prev,
-      tasks: prev.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-    }));
+  const handleAdminLogout = () => {
+    setIsAdmin(false);
+    localStorage.removeItem("isAdmin");
   };
 
   return (
     <div className="app">
-      <Header />
+      <Toaster position="top-right" />
 
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: "#fff",
-            color: "#333",
-            borderRadius: "8px",
-            fontSize: "14px",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
-          },
-        }}
-      />
-
-      {/* Show navbar only when Admin role */}
-      {role === "admin" && <AdminNavbar />}
-
-      <RoleSwitcher role={role} setRole={setRole} />
+      {/* Header + Navbar */}
+      {(session || isAdmin) && <Header onAdminLogout={handleAdminLogout} />}
+      {isAdmin && <AdminNavbar />}
 
       <Routes>
+        {/* Admin Login */}
         <Route
-          path="/"
+          path="/admin-login"
+          element={!isAdmin ? <AdminLogin onSuccess={handleAdminLoginSuccess} /> : <Navigate to="/admin" />}
+        />
+
+        {/* User Auth (Supabase) */}
+        <Route path="/auth/login" element={!session ? <Login /> : <Navigate to="/" />} />
+        <Route path="/auth/signup" element={!session ? <Signup /> : <Navigate to="/" />} />
+        <Route path="/auth/forgot" element={<ForgotPassword />} />
+
+        {/* Admin Panel */}
+        <Route
+          path="/admin"
           element={
-            role === "admin" ? (
+            isAdmin ? (
               <AdminPanel
-                role={role}
+                role="admin"
+                groups={state.groups}
                 addGroup={addGroup}
                 approveGroup={approveGroup}
                 assignLeader={assignLeader}
-                groups={state.groups}
               />
             ) : (
+              <Navigate to="/admin-login" />
+            )
+          }
+        />
+
+        {/* User Home */}
+        <Route
+          path="/"
+          element={
+            session ? (
               <LeaderMemberDashboard
-                role={role}
+                role="user"
                 groups={state.groups}
                 tasks={state.tasks}
                 addTask={addTask}
                 updateTask={updateTask}
               />
+            ) : (
+              <Navigate to="/auth/login" />
             )
           }
         />
 
+        {/* TaskBoard */}
         <Route
           path="/board"
           element={
-            <TaskBoard
-              role={role}
-              addTask={addTask}
-              updateTask={updateTask}
-              tasks={state.tasks}
-              groups={state.groups}
-            />
+            session ? (
+              <TaskBoard
+                role="user"
+                tasks={state.tasks}
+                groups={state.groups}
+                addTask={addTask}
+                updateTask={updateTask}
+              />
+            ) : (
+              <Navigate to="/auth/login" />
+            )
           }
         />
 
+        {/* <Route path="/" element={
+          <ProtectedRoute session={session}>
+            {profile?.role === "admin" ? <AdminPanel /> : <LeaderMemberDashboard />}
+          </ProtectedRoute>
+        } />
+
+        <Route path="/reports" element={
+          <ProtectedRoute session={session}>
+            <AdminRoute profile={profile}>
+              <Reports state={state} />
+            </AdminRoute>
+          </ProtectedRoute>
+        } /> */}
+
+        {/* Reports - Only admin */}
         <Route
           path="/reports"
           element={
-            <Reports
-              tasks={state.tasks}
-              groups={state.groups}
-            />
+            isAdmin ? <Reports state={state} /> : <Navigate to="/admin-login" />
           }
         />
       </Routes>

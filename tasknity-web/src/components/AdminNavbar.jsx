@@ -11,7 +11,7 @@ export default function AdminNavbar() {
 
         <div className="flex gap-6 text-gray-700 font-medium">
           <Link 
-            to="/admin" 
+            to="/" 
             className="hover:text-blue-600 transition"
           >
             Groups

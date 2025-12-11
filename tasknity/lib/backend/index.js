@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 dotenv.config();
 
 const app = express();
+app.use(express.static('public')); // serve reset-password.html
 app.use(cors());
 app.use(bodyParser.json());
 
@@ -18,7 +19,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Helper to get user from Authorization header
+// Helper: Get user from Authorization header
 async function getUserFromAuthHeader(req) {
   const authHeader = req.headers.authorization;
   if (!authHeader) return null;
@@ -36,57 +37,126 @@ async function getUserFromAuthHeader(req) {
 
 // Signup
 app.post("/signup", async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, full_name } = req.body;
 
-  // Check if email already exists in users table
-  const { data: existingUser } = await supabase
-    .from("users")
-    .select("*")
-    .eq("email", email)
-    .single();
+  if (!email || !password || !full_name) {
+    return res.status(400).json({ error: "Email, password, and full name are required" });
+  }
 
-  if (existingUser) return res.status(400).json({ error: "Email already registered" });
+  try {
+    // Check if email already exists in users table
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single()
+      .catch(() => ({ data: null }));
 
-  // Create in Supabase Auth
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) return res.status(400).json({ error: error.message });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
 
-  // Add to users table
-  await supabase.from("users").insert([{ email, auth_id: data.user.id }]);
+    // Signup with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name } },
+    });
 
-  res.json({ message: "Signup successful! Check your email to verify.", data });
+    if (authError) {
+      console.error("Supabase Auth error:", authError);
+      return res.status(400).json({ error: authError.message });
+    }
+
+    // Insert into users table ONLY if user exists
+    if (authData.user) {
+      const supabaseUserId = authData.user.id;
+
+      const { data: newUser, error: insertError } = await supabase
+        .from("users")
+        .insert([{ id: supabaseUserId, email, full_name }])
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("Insert into users table failed:", insertError);
+        return res.status(500).json({ error: insertError.message });
+      }
+
+      return res.json({
+        message: "Signup successful! Please check your email to confirm.",
+        user: newUser,
+      });
+    } else {
+      return res.json({
+        message: "Signup successful! Please check your email to confirm.",
+        user: null,
+      });
+    }
+
+  } catch (err) {
+    console.error("Server error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Login: only if exists in users table AND correct password
+// Login
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
-  // 1️⃣ Check if user exists in users table
-  const { data: dbUser, error: dbError } = await supabase
-    .from("users")
-    .select("*")
-    .eq("email", email)
-    .single();
+  try {
+    // Sign in user
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-  if (dbError || !dbUser) return res.status(401).json({ error: "User not allowed to login" });
+    if (error || !data?.user) {
+      return res
+        .status(401)
+        .json({ error: error?.message || "Invalid email or password" });
+    }
 
-  // 2️⃣ Authenticate with Supabase Auth
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    // Fetch user profile from users table (using try/catch)
+    let userProfile = null;
 
-  if (error || !data.session) {
-    return res.status(401).json({ error: "Invalid email or password" });
+    try {
+      const { data: profile } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email)
+        .single();
+
+      userProfile = profile;
+    } catch (profileError) {
+      console.error("User profile fetch error:", profileError);
+      userProfile = null; // fallback
+    }
+
+    // Response
+    res.json({
+      message: "Login successful",
+      token: data.session?.access_token,
+      user: userProfile || data.user
+    });
+
+  } catch (err) {
+    console.error("Login server error:", err);
+    res.status(500).json({ error: "Server error" });
   }
-
-  res.json({ message: "Login successful", token: data.session.access_token, user: data.user });
 });
+
 
 // Forgot password
 app.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
+
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: "http://localhost:5000/reset-password"
+    redirectTo: "http://192.168.16.109:5000/reset-password.html"
   });
+
   if (error) return res.status(400).json({ error: error.message });
+
   res.json({ message: "Password reset email sent!" });
 });
 
@@ -98,7 +168,11 @@ app.get("/groups", async (req, res) => {
   const user = await getUserFromAuthHeader(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-  const { data, error } = await supabase.from("groups").select("*, tasks(*)").eq("owner", user.id);
+  const { data, error } = await supabase
+    .from("groups")
+    .select("*, tasks(*)")
+    .eq("owner", user.id);
+
   if (error) return res.status(500).json({ error: error.message });
 
   res.json(data);
@@ -109,7 +183,12 @@ app.post("/groups", async (req, res) => {
   if (!user) return res.status(401).json({ error: "Unauthorized" });
 
   const { name, description } = req.body;
-  const { data, error } = await supabase.from("groups").insert([{ name, description, owner: user.id }]).select().single();
+  const { data, error } = await supabase
+    .from("groups")
+    .insert([{ name, description, owner: user.id }])
+    .select()
+    .single();
+
   if (error) return res.status(500).json({ error: error.message });
 
   res.json(data);
@@ -130,7 +209,12 @@ app.post("/groups/:groupId/tasks", async (req, res) => {
   if (!group) return res.status(404).json({ error: "Group not found" });
   if (group.owner !== user.id) return res.status(403).json({ error: "Forbidden" });
 
-  const { data, error } = await supabase.from("tasks").insert([{ group_id: Number(groupId), title, status: status || "Pending" }]).select().single();
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert([{ group_id: Number(groupId), title, status: status || "Pending" }])
+    .select()
+    .single();
+
   if (error) return res.status(500).json({ error: error.message });
 
   res.json(data);
