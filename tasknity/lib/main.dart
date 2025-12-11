@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
-import 'screens/dashboard_screen.dart';
 
 void main() {
   runApp(const TasknityApp());
@@ -23,7 +22,7 @@ class TasknityApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
-        '/dashboard': (context) => const DashboardScreen(),
+        // NOTE: '/dashboard' is REMOVED here because it requires dynamic arguments.
       },
     );
   }

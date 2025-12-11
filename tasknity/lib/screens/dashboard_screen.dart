@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final String userRole;
+  final String userName;
+
+  // Constructor requires these two variables
+  const DashboardScreen({
+    super.key, 
+    required this.userRole, 
+    required this.userName
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  String currentUserRole = "Admin"; // Can be Admin / ProjectLeader / Individual
-  String currentUser = "Manisha"; // Current user name for assignment simulation
-
+  // Mock Data
   List<Map<String, dynamic>> groups = [
     {
       "id": 1,
@@ -24,12 +30,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           "status": "In Progress",
           "assignedTo": "Alice",
           "dueDate": DateTime.now().add(const Duration(days: 2)),
-        },
-        {
-          "title": "Prepare color palette",
-          "status": "Pending",
-          "assignedTo": "Bob",
-          "dueDate": DateTime.now().add(const Duration(days: -1)), // overdue
+          "issueReported": false,
         },
       ],
       "approved": true,
@@ -40,372 +41,243 @@ class _DashboardScreenState extends State<DashboardScreen> {
       "description": "Frontend & Backend",
       "leader": "David",
       "members": ["David", "Eva", "Frank"],
-      "tasks": [
-        {
-          "title": "Set up database schema",
-          "status": "Done",
-          "assignedTo": "David",
-          "dueDate": DateTime.now().add(const Duration(days: 0)),
-        },
-        {
-          "title": "Build login screen",
-          "status": "In Progress",
-          "assignedTo": "Eva",
-          "dueDate": DateTime.now().add(const Duration(days: 1)),
-        },
-      ],
-      "approved": true,
+      "tasks": [],
+      "approved": false, // Needs admin approval
     }
   ];
 
-  String filter = "All"; // Task filter
+  List<String> notifications = [];
 
-  // ---------------- SIGN OUT ----------------
+  @override
+  void initState() {
+    super.initState();
+    // Simulate notifications based on role
+    if (widget.userRole == "Admin") {
+      notifications.add("New group 'Dev Team' needs approval.");
+    }
+  }
+
+  // --- ACTIONS ---
+
   void _signOut() {
     Navigator.pushReplacementNamed(context, '/login');
   }
 
-  // ---------------- ADD GROUP (Admin only) ----------------
+  // Admin: Add Group
   void _addGroupDialog() {
-    if (currentUserRole != "Admin") return;
-
-    final nameController = TextEditingController();
-    final descController = TextEditingController();
-    final leaderController = TextEditingController();
-    final membersController = TextEditingController();
-
+    final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    final leaderCtrl = TextEditingController();
+    
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Add New Group'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                    labelText: 'Group Name', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: descController,
-                decoration: const InputDecoration(
-                    labelText: 'Description', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: leaderController,
-                decoration: const InputDecoration(
-                    labelText: 'Leader Name', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: membersController,
-                decoration: const InputDecoration(
-                    labelText: 'Members (comma separated)',
-                    border: OutlineInputBorder()),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-              onPressed: () {
-                if (nameController.text.trim().isEmpty) return;
-                setState(() {
-                  groups.add({
-                    "id": DateTime.now().millisecondsSinceEpoch,
-                    "name": nameController.text.trim(),
-                    "description": descController.text.trim(),
-                    "leader": leaderController.text.trim(),
-                    "members": membersController.text
-                        .split(",")
-                        .map((e) => e.trim())
-                        .toList(),
-                    "tasks": [],
-                    "approved": false, // Needs admin approval
-                  });
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('Add')),
-        ],
-      ),
-    );
-  }
-
-  // ---------------- ADD TASK ----------------
-  void _addTaskDialog(Map<String, dynamic> group) {
-    // Only Admin or ProjectLeader can add tasks
-    if (!(currentUserRole == "Admin" || currentUserRole == "ProjectLeader")) return;
-
-    final titleController = TextEditingController();
-    final dueDateController = TextEditingController();
-    String selectedStatus = "Pending";
-    String assignedTo = group["members"].isNotEmpty ? group["members"][0] : currentUser;
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Add Task to ${group["name"]}'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                    labelText: 'Task Title', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                value: assignedTo,
-                decoration: const InputDecoration(
-                    labelText: 'Assign To', border: OutlineInputBorder()),
-                items: group["members"]
-                    .map<DropdownMenuItem<String>>(
-                        (m) => DropdownMenuItem(value: m, child: Text(m)))
-                    .toList(),
-                onChanged: (value) => assignedTo = value!,
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                value: selectedStatus,
-                decoration: const InputDecoration(
-                    labelText: 'Status', border: OutlineInputBorder()),
-                items: const [
-                  DropdownMenuItem(value: "Pending", child: Text("Pending")),
-                  DropdownMenuItem(value: "In Progress", child: Text("In Progress")),
-                  DropdownMenuItem(value: "Done", child: Text("Done")),
-                ],
-                onChanged: (value) => selectedStatus = value!,
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: dueDateController,
-                decoration: const InputDecoration(
-                    labelText: 'Due Date (YYYY-MM-DD)',
-                    border: OutlineInputBorder()),
-              ),
-            ],
-          ),
+        title: const Text('Create Group'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Group Name')),
+            TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description')),
+            TextField(controller: leaderCtrl, decoration: const InputDecoration(labelText: 'Leader Name')),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
-              if (titleController.text.trim().isEmpty) return;
-              DateTime dueDate = DateTime.tryParse(dueDateController.text) ??
-                  DateTime.now().add(const Duration(days: 1));
               setState(() {
-                group["tasks"].add({
-                  "title": titleController.text.trim(),
-                  "status": selectedStatus,
-                  "assignedTo": assignedTo,
-                  "dueDate": dueDate,
+                groups.add({
+                  "id": DateTime.now().millisecondsSinceEpoch,
+                  "name": nameCtrl.text,
+                  "description": descCtrl.text,
+                  "leader": leaderCtrl.text,
+                  "members": [leaderCtrl.text],
+                  "tasks": [],
+                  "approved": true,
                 });
               });
               Navigator.pop(context);
             },
-            child: const Text('Add Task'),
+            child: const Text('Add'),
           ),
         ],
       ),
     );
   }
 
-  // ---------------- VIEW TASKS ----------------
+  // Admin: Global Alert
+  void _sendBroadcastAlert() {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Alert sent to all groups!")));
+  }
+
+  // Leader: Add Task
+  void _addTaskDialog(Map<String, dynamic> group) {
+    final titleCtrl = TextEditingController();
+    String assignedTo = group["members"].isNotEmpty ? group["members"][0] : widget.userName;
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            title: const Text('Assign Task'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: titleCtrl, decoration: const InputDecoration(labelText: 'Task Title')),
+                const SizedBox(height: 10),
+                DropdownButton<String>(
+                  value: assignedTo,
+                  isExpanded: true,
+                  items: group["members"].map<DropdownMenuItem<String>>((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                  onChanged: (val) => setDialogState(() => assignedTo = val!),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    group["tasks"].add({
+                      "title": titleCtrl.text,
+                      "status": "Pending",
+                      "assignedTo": assignedTo,
+                      "dueDate": DateTime.now().add(const Duration(days: 3)),
+                      "issueReported": false,
+                    });
+                  });
+                  Navigator.pop(context);
+                },
+                child: const Text('Assign'),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
+  // Individual: Report Issue
+  void _reportIssue(Map<String, dynamic> task) {
+    setState(() {
+      task["issueReported"] = true;
+    });
+    Navigator.pop(context); // Close task view
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Leader notified of difficulty.")));
+  }
+
+  // View Tasks Logic
   void _viewTasksDialog(Map<String, dynamic> group) {
     List tasks = group["tasks"];
-    List filteredTasks = tasks.where((task) {
-      if (filter == "All") return true;
-      return task["status"] == filter;
-    }).toList();
-
-    int done = tasks.where((t) => t["status"] == "Done").length;
-    int total = tasks.length;
-    double progress = total == 0 ? 0 : done / total;
+    
+    // Individuals only see their own tasks
+    if (widget.userRole == "Individual") {
+      tasks = tasks.where((t) => t["assignedTo"] == widget.userName).toList();
+    }
 
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('${group["name"]} — Tasks'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LinearProgressIndicator(value: progress),
-              const SizedBox(height: 6),
-              Text("Completed: $done / $total"),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                children: [
-                  ChoiceChip(
-                      label: const Text("All"),
-                      selected: filter == "All",
-                      onSelected: (_) => setState(() => filter = "All")),
-                  ChoiceChip(
-                      label: const Text("Pending"),
-                      selected: filter == "Pending",
-                      onSelected: (_) => setState(() => filter = "Pending")),
-                  ChoiceChip(
-                      label: const Text("In Progress"),
-                      selected: filter == "In Progress",
-                      onSelected: (_) => setState(() => filter = "In Progress")),
-                  ChoiceChip(
-                      label: const Text("Done"),
-                      selected: filter == "Done",
-                      onSelected: (_) => setState(() => filter = "Done")),
-                ],
-              ),
-              const SizedBox(height: 10),
-              filteredTasks.isEmpty
-                  ? const Text("No tasks in this filter.")
-                  : Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: filteredTasks.map<Widget>((task) {
-                        bool overdue = task["dueDate"].isBefore(DateTime.now()) &&
-                            task["status"] != "Done";
-
-                        return Card(
-                          color: overdue ? Colors.red[50] : null,
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          child: ListTile(
-                            title: Text(task["title"]),
-                            subtitle: Text(
-                                "Status: ${task["status"]} | Assigned: ${task["assignedTo"]} | Due: ${task["dueDate"].toString().split(' ')[0]}"),
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (newStatus) {
-                                setState(() {
-                                  task["status"] = newStatus;
-                                });
-                                Navigator.pop(context);
-                                _viewTasksDialog(group);
-                              },
-                              itemBuilder: (_) => const [
-                                PopupMenuItem(
-                                    value: "Pending", child: Text("Pending")),
-                                PopupMenuItem(
-                                    value: "In Progress",
-                                    child: Text("In Progress")),
-                                PopupMenuItem(value: "Done", child: Text("Done")),
-                              ],
-                              child: const Icon(Icons.more_vert),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-            ],
+        title: Text('${group["name"]} Tasks'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: tasks.isEmpty 
+          ? const Text("No tasks found.") 
+          : ListView.builder(
+            shrinkWrap: true,
+            itemCount: tasks.length,
+            itemBuilder: (ctx, i) {
+              final t = tasks[i];
+              return ListTile(
+                title: Text(t["title"]),
+                subtitle: Text("Status: ${t["status"]}"),
+                trailing: widget.userRole == "Individual" 
+                  ? IconButton(
+                      icon: const Icon(Icons.report_problem, color: Colors.orange),
+                      tooltip: "Report Difficulty",
+                      onPressed: () => _reportIssue(t),
+                    )
+                  : null,
+              );
+            },
           ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-          if (currentUserRole != "Individual")
+          if (widget.userRole == "ProjectLeader")
             ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _addTaskDialog(group);
-                },
-                child: const Text('Add Task')),
+              onPressed: () {
+                Navigator.pop(context);
+                _addTaskDialog(group);
+              },
+              child: const Text('Add Task'),
+            )
         ],
       ),
     );
-
-    // Notification for overdue tasks
-    if (tasks.any((t) =>
-        t["dueDate"].isBefore(DateTime.now()) && t["status"] != "Done")) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Some tasks are overdue!')));
-    }
-  }
-
-  // ---------------- GROUP SUMMARY REPORT ----------------
-  void _showGroupReport(Map<String, dynamic> group) {
-    int total = group["tasks"].length;
-    int pending = group["tasks"].where((t) => t["status"] == "Pending").length;
-    int inProgress =
-        group["tasks"].where((t) => t["status"] == "In Progress").length;
-    int done = group["tasks"].where((t) => t["status"] == "Done").length;
-
-    showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-              title: Text("${group["name"]} Report"),
-              content: Text(
-                  "Leader: ${group["leader"]}\nMembers: ${group["members"].join(", ")}\nTotal Tasks: $total\nPending: $pending\nIn Progress: $inProgress\nDone: $done"),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text("Close")),
-              ],
-            ));
   }
 
   @override
   Widget build(BuildContext context) {
+    // Filter groups based on role
+    List<Map<String, dynamic>> visibleGroups = groups;
+    if (widget.userRole == "ProjectLeader") {
+      visibleGroups = groups.where((g) => g["leader"] == widget.userName).toList();
+    } else if (widget.userRole == "Individual") {
+      visibleGroups = groups.where((g) => (g["members"] as List).contains(widget.userName)).toList();
+    }
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tasknity Dashboard'),
+        title: Text('${widget.userRole} Dashboard'),
+        backgroundColor: widget.userRole == "Admin" ? Colors.blueGrey : Colors.indigo,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(onPressed: _signOut, icon: const Icon(Icons.logout)),
         ],
       ),
       body: ListView.builder(
-          itemCount: groups.length,
-          itemBuilder: (context, i) {
-            final g = groups[i];
+        itemCount: visibleGroups.length,
+        itemBuilder: (ctx, i) {
+          final g = visibleGroups[i];
 
-            if (!g["approved"] && currentUserRole != "Admin") return const SizedBox();
-
-            int pending =
-                g["tasks"].where((t) => t["status"] == "Pending").length;
-            int inProgress =
-                g["tasks"].where((t) => t["status"] == "In Progress").length;
-            int done = g["tasks"].where((t) => t["status"] == "Done").length;
-            int total = g["tasks"].length;
-
+          // Admin Approval Logic
+          if (widget.userRole == "Admin" && g["approved"] == false) {
             return Card(
-              margin: const EdgeInsets.all(10),
+              color: Colors.amber[50],
+              margin: const EdgeInsets.all(8),
               child: ListTile(
-                title: Text(g["name"]),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(g["description"]),
-                    const SizedBox(height: 4),
-                    Text("Leader: ${g["leader"]}"),
-                    Text(
-                        "Tasks: $total | Pending: $pending | In Progress: $inProgress | Done: $done",
-                        style: const TextStyle(fontSize: 12)),
-                  ],
-                ),
-                trailing: Wrap(
-                  spacing: 4,
-                  children: [
-                    IconButton(
-                        icon: const Icon(Icons.visibility),
-                        tooltip: "View Tasks",
-                        onPressed: () => _viewTasksDialog(g)),
-                    IconButton(
-                        icon: const Icon(Icons.insert_chart),
-                        tooltip: "Group Report",
-                        onPressed: () => _showGroupReport(g)),
-                  ],
+                title: Text("${g["name"]} (Pending Approval)"),
+                trailing: ElevatedButton(
+                  onPressed: () => setState(() => g["approved"] = true),
+                  child: const Text("Approve"),
                 ),
               ),
             );
-          }),
-      floatingActionButton: currentUserRole == "Admin"
-          ? FloatingActionButton.extended(
-              onPressed: _addGroupDialog,
-              label: const Text('Add Group'),
-              icon: const Icon(Icons.add),
-            )
-          : null,
+          }
+
+          if (g["approved"] == false) return const SizedBox.shrink();
+
+          return Card(
+            margin: const EdgeInsets.all(8),
+            child: ListTile(
+              title: Text(g["name"]),
+              subtitle: Text(g["description"]),
+              trailing: IconButton(
+                icon: const Icon(Icons.visibility),
+                onPressed: () => _viewTasksDialog(g),
+              ),
+            ),
+          );
+        },
+      ),
+      floatingActionButton: widget.userRole == "Admin"
+        ? FloatingActionButton(
+            onPressed: _addGroupDialog,
+            child: const Icon(Icons.add),
+          )
+        : null,
     );
   }
 }
