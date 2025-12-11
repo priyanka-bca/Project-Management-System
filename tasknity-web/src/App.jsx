@@ -139,6 +139,20 @@ export default function App() {
           }
         />
 
+        {/* <Route path="/" element={
+          <ProtectedRoute session={session}>
+            {profile?.role === "admin" ? <AdminPanel /> : <LeaderMemberDashboard />}
+          </ProtectedRoute>
+        } />
+
+        <Route path="/reports" element={
+          <ProtectedRoute session={session}>
+            <AdminRoute profile={profile}>
+              <Reports state={state} />
+            </AdminRoute>
+          </ProtectedRoute>
+        } /> */}
+
         {/* Reports - Only admin */}
         <Route
           path="/reports"
