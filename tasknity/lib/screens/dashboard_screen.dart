@@ -206,7 +206,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: status,
+              initialValue: status,
               items: const [
                 DropdownMenuItem(value: "Pending", child: Text("Pending")),
                 DropdownMenuItem(
