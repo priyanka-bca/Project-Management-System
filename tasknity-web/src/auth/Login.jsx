@@ -1,67 +1,67 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { supabase } from "../supabase";
-import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  async function handleLogin(e) {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
-      password
+      password,
     });
 
     if (error) return toast.error(error.message);
 
-    toast.success("Logged in!");
+    toast.success("Login successful!");
     navigate("/");
-  }
+  };
 
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-100">
-      <form onSubmit={handleLogin}
-        className="bg-white p-8 rounded shadow w-96 text-center">
-
+    <div className="flex justify-center items-center min-h-screen bg-gray-100">
+      <div className="bg-white w-96 shadow-lg p-6 rounded">
         <h2 className="text-2xl font-bold mb-4">Login</h2>
 
-        <input
-          type="email"
-          className="w-full p-2 border rounded mb-3"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <form onSubmit={handleLogin} className="space-y-3">
+          <input
+            type="email"
+            className="border p-2 rounded w-full"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-        <input
-          type="password"
-          className="w-full p-2 border rounded mb-3"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+          <input
+            type="password"
+            className="border p-2 rounded w-full"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
 
-        <button className="w-full bg-blue-600 text-white py-2 rounded">
-          Login
-        </button>
+          <button className="bg-blue-600 text-white px-4 py-2 rounded w-full">
+            Login
+          </button>
+        </form>
 
-        <Link to="/auth/forgot" className="text-sm block mt-2 text-blue-600">
-          Forgot Password?
-        </Link>
+        <p className="mt-3 text-sm">
+          Don’t have an account?{" "}
+          <Link className="text-blue-600" to="/auth/signup">Signup</Link>
+        </p>
 
-        <Link to="/auth/signup" className="text-sm block mt-2 text-blue-600">
-          Create Account
-        </Link>
-
-        <Link to="/admin-login" className="text-sm block mt-3 text-red-700 font-bold">
-          Admin Login →
-        </Link>
-
-      </form>
+        <p className="text-sm mt-1">
+          <Link className="text-blue-600" to="/auth/forgot">
+            Forgot password?
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
