@@ -11,57 +11,54 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) return toast.error(error.message);
 
-    toast.success("Login successful!");
+    toast.success("Logged in successfully");
     navigate("/");
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100">
-      <div className="bg-white w-96 shadow-lg p-6 rounded">
-        <h2 className="text-2xl font-bold mb-4">Login</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <form
+        onSubmit={handleLogin}
+        className="bg-white p-6 w-96 rounded shadow space-y-4"
+      >
+        <h2 className="text-xl font-bold text-center">Login</h2>
 
-        <form onSubmit={handleLogin} className="space-y-3">
-          <input
-            type="email"
-            className="border p-2 rounded w-full"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+        <input
+          type="email"
+          placeholder="Email"
+          className="border p-2 w-full rounded"
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
 
-          <input
-            type="password"
-            className="border p-2 rounded w-full"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+        <input
+          type="password"
+          placeholder="Password"
+          className="border p-2 w-full rounded"
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
 
-          <button className="bg-blue-600 text-white px-4 py-2 rounded w-full">
-            Login
-          </button>
-        </form>
+        <button className="bg-blue-600 text-white w-full py-2 rounded">
+          Login
+        </button>
 
-        <p className="mt-3 text-sm">
-          Don’t have an account?{" "}
-          <Link className="text-blue-600" to="/auth/signup">Signup</Link>
-        </p>
-
-        <p className="text-sm mt-1">
-          <Link className="text-blue-600" to="/auth/forgot">
+        <div className="text-sm text-center space-y-1">
+          <Link to="/auth/signup" className="text-blue-600 block">
+            Create new account
+          </Link>
+          <Link to="/auth/forgot" className="text-blue-600 block">
             Forgot password?
           </Link>
-        </p>
-      </div>
+        </div>
+      </form>
     </div>
   );
 }
