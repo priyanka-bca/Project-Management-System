@@ -10,6 +10,7 @@ export default function AdminNavbar() {
           <Link className="hover:text-blue-600" to="/">Groups</Link>
           <Link className="hover:text-blue-600" to="/board">Task Board</Link>
           <Link className="hover:text-blue-600" to="/reports">Reports</Link>
+          <Link className="hover:text-blue-600" to="/admin/analytics">Analytics</Link>
         </div>
       </div>
     </nav>
