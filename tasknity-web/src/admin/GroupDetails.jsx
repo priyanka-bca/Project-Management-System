@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import TaskList from "./TaskList";
 import { supabase } from "../supabase";
 
 export default function GroupDetails() {
@@ -121,6 +122,14 @@ export default function GroupDetails() {
           </ul>
         )}
       </div>
+
+      {/* TASK LIST */}
+      <div className="bg-white p-4 border rounded shadow">
+        <h2 className="font-semibold mb-3">Tasks</h2>
+
+        <TaskList groupId={groupId} />
+      </div>
+
 
       {/* TASK MODAL */}
       {showTaskModal && (

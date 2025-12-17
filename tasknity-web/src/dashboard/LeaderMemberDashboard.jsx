@@ -3,135 +3,138 @@ import { supabase } from "../supabase";
 
 export default function LeaderMemberDashboard() {
   const [tasks, setTasks] = useState([]);
-  const [profile, setProfile] = useState(null);
+  const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadProfileAndTasks();
+    loadLeaderData();
   }, []);
 
-  const loadProfileAndTasks = async () => {
-    // 1️⃣ Get logged-in user
+  const loadLeaderData = async () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) return;
 
-    // 2️⃣ Get profile (role, name)
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", user.id)
+    // 1️⃣ Get leader's group
+    const { data: membership } = await supabase
+      .from("group_members")
+      .select(`
+        group_id,
+        groups (
+          id,
+          name
+        )
+      `)
+      .eq("user_id", user.id)
+      .eq("role", "leader")
       .single();
 
-    setProfile(profileData);
-
-    // 3️⃣ Load tasks based on role
-    if (profileData.role === "leader") {
-      loadLeaderTasks(user.id);
-    } else {
-      loadMemberTasks(user.id);
+    if (!membership) {
+      setLoading(false);
+      return;
     }
 
-    setLoading(false);
-  };
+    setGroup(membership.groups);
 
-  /* -------- LEADER TASKS -------- */
-  const loadLeaderTasks = async (leaderId) => {
-    const { data } = await supabase
+    // 2️⃣ Load tasks of the group
+    const { data: tasksData } = await supabase
       .from("tasks")
       .select(`
         id,
         title,
-        issued_at,
-        due_at,
         status,
-        profiles ( name )
-      `);
+        issued_at,
+        due_date,
+        profiles (
+          name
+        )
+      `)
+      .eq("group_id", membership.group_id)
+      .order("due_date", { ascending: true });
 
-    setTasks(data || []);
+    setTasks(tasksData || []);
+    setLoading(false);
   };
 
-  /* -------- MEMBER TASKS -------- */
-  const loadMemberTasks = async (userId) => {
-    const { data } = await supabase
-      .from("tasks")
-      .select("*")
-      .eq("assigned_to", userId);
-
-    setTasks(data || []);
-  };
-
-  /* -------- UPDATE STATUS (LEADER) -------- */
   const updateStatus = async (taskId, status) => {
     await supabase
       .from("tasks")
       .update({ status })
       .eq("id", taskId);
 
-    loadProfileAndTasks();
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, status } : t
+      )
+    );
   };
 
-  if (loading) return <p className="p-6">Loading dashboard...</p>;
+  if (loading) return <p className="p-6">Loading...</p>;
+
+  if (!group)
+    return (
+      <p className="p-6 text-gray-500">
+        You are not assigned as a leader.
+      </p>
+    );
 
   return (
-    <main className="max-w-6xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold">
-        {profile.role === "leader" ? "Leader Dashboard" : "Member Dashboard"}
+    <main className="max-w-6xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">
+        Leader Dashboard — {group.name}
       </h1>
 
-      <p className="text-gray-600">
-        Welcome, <span className="font-medium">{profile.name}</span>
-      </p>
+      {tasks.length === 0 ? (
+        <p className="text-gray-500">No tasks yet.</p>
+      ) : (
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="p-2 border">Task</th>
+              <th className="p-2 border">Assigned To</th>
+              <th className="p-2 border">Issued</th>
+              <th className="p-2 border">Due</th>
+              <th className="p-2 border">Status</th>
+            </tr>
+          </thead>
 
-      {/* TASK LIST */}
-      <div className="bg-white border rounded shadow p-4">
-        {tasks.length === 0 ? (
-          <p className="text-gray-500">No tasks assigned.</p>
-        ) : (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-2">Task</th>
-                <th className="text-left p-2">Issued</th>
-                <th className="text-left p-2">Due</th>
-                <th className="text-left p-2">Status</th>
-                {profile.role === "leader" && (
-                  <th className="text-left p-2">Action</th>
-                )}
+          <tbody>
+            {tasks.map((task) => (
+              <tr key={task.id}>
+                <td className="p-2 border">{task.title}</td>
+                <td className="p-2 border">
+                  {task.profiles?.name}
+                </td>
+                <td className="p-2 border">
+                  {new Date(task.issued_at).toLocaleDateString()}
+                </td>
+                <td className="p-2 border">
+                  {new Date(task.due_date).toLocaleDateString()}
+                </td>
+                <td className="p-2 border">
+                  <select
+                    value={task.status}
+                    onChange={(e) =>
+                      updateStatus(task.id, e.target.value)
+                    }
+                    className="border rounded p-1"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">
+                      In Progress
+                    </option>
+                    <option value="completed">
+                      Completed
+                    </option>
+                  </select>
+                </td>
               </tr>
-            </thead>
-
-            <tbody>
-              {tasks.map((t) => (
-                <tr key={t.id} className="border-b">
-                  <td className="p-2">{t.title}</td>
-                  <td className="p-2">{t.issued_at}</td>
-                  <td className="p-2">{t.due_at}</td>
-                  <td className="p-2 capitalize">{t.status}</td>
-
-                  {profile.role === "leader" && (
-                    <td className="p-2">
-                      <select
-                        value={t.status}
-                        onChange={(e) =>
-                          updateStatus(t.id, e.target.value)
-                        }
-                        className="border p-1 rounded"
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                      </select>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+            ))}
+          </tbody>
+        </table>
+      )}
     </main>
   );
 }
