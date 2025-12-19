@@ -1,29 +1,39 @@
-import { useState } from "react";
-import { supabase } from "../supabase";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 
 export default function Signup() {
-  const [email, setEmail] = useState("");
-  const navigate = useNavigate();
+  const [email, setEmail] = useState("")
+  const navigate = useNavigate()
 
-  const handleSignup = async (e) => {
-    e.preventDefault();
+  const sendOtp = async (e) => {
+    e.preventDefault()
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: true },
-    });
+const res = await fetch(
+  "https://zsangtjxipvxbwmdmzoy.functions.supabase.co/send-otp",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      // 🔑 REQUIRED
+      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    },
+    body: JSON.stringify({ email }),
+  }
+);
 
-    if (error) {
-      alert(error.message);
-    } else {
-      navigate("/auth/verify", { state: { email } });
+    const data = await res.json()
+
+    if (!res.ok) {
+      alert(data.error)
+      return
     }
-  };
+
+    navigate("/auth/verify", { state: { email } })
+  }
 
   return (
-    <form onSubmit={handleSignup} className="auth-card">
-      <h2>Create Account</h2>
+    <form onSubmit={sendOtp} className="auth-card">
+      <h2>Sign Up</h2>
 
       <input
         type="email"
@@ -35,5 +45,5 @@ export default function Signup() {
 
       <button type="submit">Send OTP</button>
     </form>
-  );
+  )
 }

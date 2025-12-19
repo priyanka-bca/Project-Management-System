@@ -1,42 +1,45 @@
-import { useState } from "react";
-import { supabase } from "../supabase";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
+import { supabase } from "../supabase"
 
 export default function VerifyOtp() {
-  const [otp, setOtp] = useState("");
-  const { state } = useLocation();
-  const navigate = useNavigate();
+  const { state } = useLocation()
+  const navigate = useNavigate()
+  const [token, setToken] = useState("")
+  const email = state?.email
 
-  const email = state?.email;
-
-  const handleVerify = async (e) => {
-    e.preventDefault();
+  const verifyOtp = async (e) => {
+    e.preventDefault()
 
     const { error } = await supabase.auth.verifyOtp({
       email,
-      token: otp,
+      token,
       type: "email",
-    });
+    })
 
     if (error) {
-      alert(error.message);
-    } else {
-      navigate("/dashboard");
+      alert(error.message)
+      return
     }
-  };
+
+    navigate("/")
+  }
+
+  if (!email) return <p>Invalid access</p>
 
   return (
-    <form onSubmit={handleVerify} className="auth-card">
+    <form onSubmit={verifyOtp} className="auth-card">
       <h2>Verify OTP</h2>
 
       <input
         type="text"
-        placeholder="6 digit code"
-        value={otp}
-        onChange={(e) => setOtp(e.target.value)}
+        placeholder="6-digit code"
+        value={token}
+        onChange={(e) => setToken(e.target.value)}
+        required
       />
 
       <button type="submit">Verify</button>
     </form>
-  );
+  )
 }
