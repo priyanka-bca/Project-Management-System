@@ -1,37 +1,17 @@
-  import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 export default function AdminNavbar() {
   return (
-    <nav className="w-full bg-white shadow-sm border-b">
-      <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-        
-        <h1 className="text-xl font-bold text-gray-800">
-          Admin Dashboard
-        </h1>
+    <nav className="bg-white shadow border-b">
+      <div className="max-w-6xl mx-auto px-6 py-3 flex justify-between items-center">
+        <h2 className="text-xl font-bold text-gray-800">Admin Panel</h2>
 
-        <div className="flex gap-6 text-gray-700 font-medium">
-          <Link 
-            to="/" 
-            className="hover:text-blue-600 transition"
-          >
-            Groups
-          </Link>
-
-          <Link 
-            to="/board" 
-            className="hover:text-blue-600 transition"
-          >
-            Task Board
-          </Link>
-
-          <Link 
-            to="/reports" 
-            className="hover:text-blue-600 transition"
-          >
-            Reports
-          </Link>
+        <div className="flex gap-6 text-gray-700">
+          <Link className="hover:text-blue-600" to="/">Groups</Link>
+          <Link className="hover:text-blue-600" to="/board">Task Board</Link>
+          <Link className="hover:text-blue-600" to="/reports">Reports</Link>
+          <Link className="hover:text-blue-600" to="/admin/analytics">Analytics</Link>
         </div>
-
       </div>
     </nav>
   );

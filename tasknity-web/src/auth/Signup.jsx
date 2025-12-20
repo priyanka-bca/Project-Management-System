@@ -1,55 +1,48 @@
-import React, { useState } from "react";
-import { supabase } from "../supabase";
-import toast from "react-hot-toast";
-import { Link } from "react-router-dom";
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 
 export default function Signup() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("")
+  const navigate = useNavigate()
 
-  async function handleSignup(e) {
-    e.preventDefault();
+  const sendOtp = async (e) => {
+    e.preventDefault()
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password
-    });
+    const res = await fetch(
+      "https://zsangtjxipvxbwmdmzoy.functions.supabase.co/send-otp",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      }
+    )
 
-    if (error) return toast.error(error.message);
+    const data = await res.json()
 
-    toast.success("Check your email for confirmation.");
+    if (!res.ok) {
+      alert(data.error || "Failed")
+      return
+    }
+
+    navigate("/auth/verify", { state: { email } })
   }
 
+
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-100">
-      <form onSubmit={handleSignup}
-        className="bg-white p-8 rounded shadow w-96 text-center">
+    <form onSubmit={sendOtp} className="auth-card">
+      <h2>Sign Up</h2>
 
-        <h2 className="text-2xl font-bold mb-4">Sign Up</h2>
+      <input
+        type="email"
+        placeholder="Email"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
 
-        <input
-          type="email"
-          className="w-full p-2 border rounded mb-3"
-          placeholder="Email"
-          onChange={(e) => setEmail(e.target.value)}
-        />
-
-        <input
-          type="password"
-          className="w-full p-2 border rounded mb-3"
-          placeholder="Password"
-          onChange={(e) => setPassword(e.target.value)}
-        />
-
-        <button className="w-full bg-green-600 text-white py-2 rounded">
-          Create Account
-        </button>
-
-        <Link to="/auth/login" className="text-sm block mt-2 text-blue-600">
-          Already have an account? Login
-        </Link>
-
-      </form>
-    </div>
-  );
+      <button type="submit">Send OTP</button>
+    </form>
+  )
 }
