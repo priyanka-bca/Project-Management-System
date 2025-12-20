@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
@@ -17,8 +18,16 @@ const PORT = process.env.PORT || 5000;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
+
 // Initialize Supabase client
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = createClient(
+  SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
+console.log("SUPABASE_URL:", process.env.SUPABASE_URL);
+console.log("SUPABASE_ANON_KEY:", process.env.SUPABASE_ANON_KEY);
+
+
 
 
 app.use(bodyParser.urlencoded({extended:true}));
@@ -79,7 +88,8 @@ app.post("/signup", async (req, res) => {
     // 3️⃣ Insert user into table
     const { data: newUser, error: insertError } = await supabase
       .from("users")
-      .insert([{ id: supabaseUserId, email, full_name, password }])
+      .insert([{ id: supabaseUserId, email, full_name }])
+
       .select()
       .single();
 
@@ -129,15 +139,17 @@ app.post("/login", async (req, res) => {
       console.log("Profile fetch error:", profileError);
     }
 
-    res.json({
-      message: "Login successful",
-      token: data.session?.access_token,
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-        full_name: profile?.full_name || data.user.user_metadata.full_name
-      }
-    });
+  res.json({
+  message: "Login successful",
+  token: data.session?.access_token,
+  user: {
+    id: data.user.id,
+    email: data.user.email,
+    full_name: profile?.full_name,
+     role: profile?.role || "member"
+  }
+});
+
 
   } catch (err) {
     console.error(err);
@@ -162,79 +174,143 @@ app.post("/forgot-password", async (req, res) => {
   res.json({ message: "Password reset email sent!" });
 });
 
-// ---------------------
-// GROUP ROUTES
-// ---------------------
+// =======================
+// TASK MANAGEMENT (LEADER)
+// =======================
 
-app.get("/groups", async (req, res) => {
+app.post("/tasks", async (req, res) => {
   const user = await getUserFromAuthHeader(req);
   if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-  const { data, error } = await supabase
-    .from("groups")
-    .select("*, tasks(*)")
-    .eq("owner", user.id);
-
-  if (error) return res.status(500).json({ error: error.message });
-
-  res.json(data);
-});
-
-app.post("/groups", async (req, res) => {
-  const user = await getUserFromAuthHeader(req);
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
-
-  const { name, description } = req.body;
-  const { data, error } = await supabase
-    .from("groups")
-    .insert([{ name, description, owner: user.id }])
-    .select()
-    .single();
-
-  if (error) return res.status(500).json({ error: error.message });
-
-  res.json(data);
-});
-
-// ---------------------
-// TASK ROUTES
-// ---------------------
-
-app.post("/groups/:groupId/tasks", async (req, res) => {
-  const user = await getUserFromAuthHeader(req);
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
-
-  const { groupId } = req.params;
-  const { title, status } = req.body;
-
-  const { data: group } = await supabase.from("groups").select("*").eq("id", groupId).single();
-  if (!group) return res.status(404).json({ error: "Group not found" });
-  if (group.owner !== user.id) return res.status(403).json({ error: "Forbidden" });
+  const { title, description, deadline, member_id } = req.body;
 
   const { data, error } = await supabase
     .from("tasks")
-    .insert([{ group_id: Number(groupId), title, status: status || "Pending" }])
+    .insert([{
+      title,
+      description,
+      deadline,
+      leader_id: user.id,
+      member_id
+    }])
     .select()
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
 
+  await supabase.from("notifications").insert([{
+    user_id: member_id,
+    message: `New task assigned: ${title}`
+  }]);
+
   res.json(data);
 });
 
-app.patch("/tasks/:taskId", async (req, res) => {
+// =======================
+// LEADER TASK VIEW
+// =======================
+
+app.get("/leader/tasks", async (req, res) => {
   const user = await getUserFromAuthHeader(req);
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
-
-  const { taskId } = req.params;
-  const { status } = req.body;
-
-  const { data, error } = await supabase.from("tasks").update({ status }).eq("id", taskId).select().single();
-  if (error) return res.status(500).json({ error: error.message });
+  const { data } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("leader_id", user.id);
 
   res.json(data);
 });
 
-// ---------------------
-app.listen(PORT, () => console.log(`🚀 API running on port ${PORT}`));
- 
+// =======================
+// MEMBER TASK VIEW
+// =======================
+
+app.get("/member/tasks", async (req, res) => {
+  const user = await getUserFromAuthHeader(req);
+  const { data } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("member_id", user.id);
+
+  res.json(data);
+});
+
+// =======================
+// UPDATE PROGRESS (MEMBER)
+// =======================
+
+app.patch("/tasks/:id/progress", async (req, res) => {
+  const user = await getUserFromAuthHeader(req);
+  const { progress } = req.body;
+
+  const { data } = await supabase
+    .from("tasks")
+    .update({
+      progress,
+      status: progress == 100 ? "completed" : "in_progress"
+    })
+    .eq("id", req.params.id)
+    .eq("member_id", user.id)
+    .select()
+    .single();
+
+  res.json(data);
+});
+
+// =======================
+// BLOCK TASK → LEADER ALERT
+// =======================
+
+app.post("/tasks/:id/block", async (req, res) => {
+  const user = await getUserFromAuthHeader(req);
+  const { reason } = req.body;
+
+  const { data: task } = await supabase
+    .from("tasks")
+    .select("leader_id,title")
+    .eq("id", req.params.id)
+    .single();
+
+  await supabase.from("notifications").insert([{
+    user_id: task.leader_id,
+    message: `Task "${task.title}" blocked: ${reason}`
+  }]);
+
+  res.json({ message: "Leader notified" });
+});
+
+// =======================
+// NOTIFICATIONS
+// =======================
+
+app.get("/notifications", async (req, res) => {
+  const user = await getUserFromAuthHeader(req);
+  const { data } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  res.json(data);
+});
+
+// =======================
+// REPORT EXPORT
+// =======================
+
+app.get("/leader/report", async (req, res) => {
+  const user = await getUserFromAuthHeader(req);
+  const { data } = await supabase
+    .from("tasks")
+    .select("title,status,progress,deadline")
+    .eq("leader_id", user.id);
+
+  res.json({
+    generated_at: new Date(),
+    total_tasks: data.length,
+    tasks: data
+  });
+});
+
+app.listen(PORT, () =>
+  console.log(`🚀 API running on port ${PORT}`)
+);
