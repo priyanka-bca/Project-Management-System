@@ -24,31 +24,36 @@ export default function Login() {
   }
 
   return (
-    <form onSubmit={handleLogin} className="auth-card">
-      <h2>Login</h2>
+    <div className="min-h-screen flex items-center justify-center from-slate-900 to-slate-800">
+      <form onSubmit={handleLogin} className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 space-y-6">
+        <h2 className="text-2xl font-bold text-center">Login Page</h2>
 
-      <input
-        type="email"
-        placeholder="Email"
-        required
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
+        <input
+          type="email"
+          placeholder="Email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-      <input
-        type="password"
-        placeholder="Password"
-        required
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+        <input
+          type="password"
+          placeholder="Password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
 
-      <button type="submit">Login</button>
+        <button type="submit"
+        className="text-blue-600 font-bold">Login</button>
 
-      <p>
-        Don’t have an account?{" "}
-        <Link to="/auth/signup">Sign up</Link>
-      </p>
-    </form>
+        <p>
+          Don’t have an account?{" "}
+          <Link
+            to="/auth/signup"
+            className="text-blue-600 font-bold p-5">Sign up</Link>
+        </p>
+      </form>
+    </div>
   )
 }

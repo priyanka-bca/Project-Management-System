@@ -19,7 +19,7 @@ export default function VerifyOtp() {
     if (error) {
       alert(error.message)
     } else {
-      navigate("/") // or dashboard
+      navigate("/auth/complete-profile")
     }
   }
 
