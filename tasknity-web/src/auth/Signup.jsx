@@ -8,28 +8,27 @@ export default function Signup() {
   const sendOtp = async (e) => {
     e.preventDefault()
 
-const res = await fetch(
-  "https://zsangtjxipvxbwmdmzoy.functions.supabase.co/send-otp",
-  {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      // 🔑 REQUIRED
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-    },
-    body: JSON.stringify({ email }),
-  }
-);
+    const res = await fetch(
+      "https://zsangtjxipvxbwmdmzoy.functions.supabase.co/send-otp",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      }
+    )
 
     const data = await res.json()
 
     if (!res.ok) {
-      alert(data.error)
+      alert(data.error || "Failed")
       return
     }
 
     navigate("/auth/verify", { state: { email } })
   }
+
 
   return (
     <form onSubmit={sendOtp} className="auth-card">
