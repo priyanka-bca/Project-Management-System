@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
-import 'screens/dashboard_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// Screens
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
-import 'screens/member/update_progress.dart';
-import 'screens/member/block_reason.dart';
-import 'screens/leader/task_detail.dart';
-import 'screens/leader/create_task.dart';
+import 'screens/reset_password.dart';
+import 'screens/dashboard_screen.dart';
 import 'screens/leader/leader_dashboard.dart';
 import 'screens/member/member_dashboard.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const TasknityApp());
 }
 
@@ -21,19 +22,60 @@ class TasknityApp extends StatelessWidget {
     return MaterialApp(
       title: 'Tasknity',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(primarySwatch: Colors.indigo, useMaterial3: true),
-      initialRoute: '/create_task',
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blueGrey),
+      home: const AuthWrapper(),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
+        '/reset-password': (context) => const ResetPasswordScreen(),
         '/dashboard': (context) => const DashboardScreen(),
-        '/update_progress': (context) => const UpdateProgressScreen(),
-        '/block_reason': (context) => const BlockReasonScreen(),
-        '/task_details': (context) => const TaskDetailsScreen(),
-        '/create_task': (context) => const CreateTaskScreen(),
-        '/leader_dashboard': (context) => const LeaderDashboard(),
-        '/member_dashboard': (context) => const MemberDashboard(),
+        '/leader-dashboard': (context) => const LeaderDashboard(),
+        '/member-dashboard': (context) => const MemberDashboard(),
       },
     );
+  }
+}
+
+class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool _loading = true;
+  String? _role;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuth();
+  }
+
+  Future<void> _checkAuth() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    final role = prefs.getString('role') ?? 'member';
+
+    setState(() {
+      _role = token != null ? role : null;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_role == 'leader') {
+      return const LeaderDashboard();
+    } else if (_role == 'member') {
+      return const MemberDashboard();
+    } else {
+      return const LoginScreen();
+    }
   }
 }
