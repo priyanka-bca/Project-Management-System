@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
 
     try {
-      final url = Uri.parse("http://192.168.10.110:5000/login");
+      final url = Uri.parse("http://192.168.10.100:5000/login");
 
       final response = await http.post(
         url,
@@ -46,15 +46,14 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.statusCode == 200) {
         final token = data['token'];
         final prefs = await SharedPreferences.getInstance();
-await prefs.setString('token', token);
-await prefs.setString('role', data['user']['role']);
-
+        await prefs.setString('token', token);
+        await prefs.setString('role', data['user']['role']);
 
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Login successful!')));
 
-        Navigator.pushReplacementNamed(context, '/dashboard');
+        Navigator.pushReplacementNamed(context, '/member-dashboard');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(data['error'] ?? 'Login failed')),
