@@ -10,54 +10,64 @@ export default function LeaderMemberDashboard() {
     loadLeaderData();
   }, []);
 
+  // Load leader group and related tasks
   const loadLeaderData = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-    // 1️⃣ Get leader's group
-    const { data: membership } = await supabase
-      .from("group_members")
-      .select(`
-        group_id,
-        groups (
+      // 1️⃣ Get leader's group
+      const { data: membership } = await supabase
+        .from("group_members")
+        .select(`
+          group_id,
+          groups (
+            id,
+            name
+          )
+        `)
+        .eq("user_id", user.id)
+        .eq("role", "leader")
+        .single();
+
+      if (!membership) {
+        setLoading(false);
+        return;
+      }
+
+      setGroup(membership.groups);
+
+      // 2️⃣ Load tasks of the group
+      const { data: tasksData } = await supabase
+        .from("tasks")
+        .select(`
           id,
-          name
-        )
-      `)
-      .eq("user_id", user.id)
-      .eq("role", "leader")
-      .single();
+          title,
+          status,
+          issued_at,
+          due_date,
+          profiles (
+            name
+          )
+        `)
+        .eq("group_id", membership.group_id)
+        .order("due_date", { ascending: true });
 
-    if (!membership) {
+      setTasks(tasksData || []);
+    } catch (error) {
+      console.error("Error loading leader data:", error);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setGroup(membership.groups);
-
-    // 2️⃣ Load tasks of the group
-    const { data: tasksData } = await supabase
-      .from("tasks")
-      .select(`
-        id,
-        title,
-        status,
-        issued_at,
-        due_date,
-        profiles (
-          name
-        )
-      `)
-      .eq("group_id", membership.group_id)
-      .order("due_date", { ascending: true });
-
-    setTasks(tasksData || []);
-    setLoading(false);
   };
 
+  // Update task status
   const updateStatus = async (taskId, status) => {
     await supabase
       .from("tasks")
@@ -65,20 +75,21 @@ export default function LeaderMemberDashboard() {
       .eq("id", taskId);
 
     setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId ? { ...t, status } : t
+      prev.map((task) =>
+        task.id === taskId ? { ...task, status } : task
       )
     );
   };
 
   if (loading) return <p className="p-6">Loading...</p>;
 
-  if (!group)
+  if (!group) {
     return (
       <p className="p-6 text-gray-500">
         You are not assigned as a leader.
       </p>
     );
+  }
 
   return (
     <main className="max-w-6xl mx-auto p-6">
@@ -105,7 +116,7 @@ export default function LeaderMemberDashboard() {
               <tr key={task.id}>
                 <td className="p-2 border">{task.title}</td>
                 <td className="p-2 border">
-                  {task.profiles?.name}
+                  {task.profiles?.name || "—"}
                 </td>
                 <td className="p-2 border">
                   {new Date(task.issued_at).toLocaleDateString()}
@@ -122,12 +133,8 @@ export default function LeaderMemberDashboard() {
                     className="border rounded p-1"
                   >
                     <option value="pending">Pending</option>
-                    <option value="in_progress">
-                      In Progress
-                    </option>
-                    <option value="completed">
-                      Completed
-                    </option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
                   </select>
                 </td>
               </tr>
