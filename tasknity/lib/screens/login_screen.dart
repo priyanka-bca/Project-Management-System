@@ -32,7 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
 
     try {
-      final url = Uri.parse("http://192.168.10.100:5000/login");
+      final url = Uri.parse("http://192.168.10.105:5000/login");
 
       final response = await http.post(
         url,

@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 class MemberDashboard extends StatefulWidget {
@@ -10,64 +12,108 @@ class MemberDashboard extends StatefulWidget {
 }
 
 class _MemberDashboardState extends State<MemberDashboard> {
-  final supabase = Supabase.instance.client;
+  final String baseUrl = "http://192.168.10.105:5000";
 
   List<Map<String, dynamic>> tasks = [];
+  bool loading = true;
 
   int total = 0;
   int completed = 0;
   int pending = 0;
 
+  String? token;
+
   @override
   void initState() {
     super.initState();
-    fetchTasks();
+    init();
   }
 
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    token = prefs.getString("token");
+    await fetchTasks();
+  }
+
+  // =====================
+  // FETCH TASKS
+  // =====================
   Future<void> fetchTasks() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+    if (token == null) return;
 
-    final response = await supabase
-        .from('tasks')
-        .select()
-        .eq('member_id', user.id)
-        .order('created_at', ascending: false);
+    final response = await http.get(
+      Uri.parse("$baseUrl/member/tasks"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+    );
 
-    tasks = List<Map<String, dynamic>>.from(response);
+    if (response.statusCode == 200) {
+      tasks = List<Map<String, dynamic>>.from(jsonDecode(response.body));
 
-    total = tasks.length;
-    completed = tasks.where((t) => t['status'] == 'completed').length;
-    pending = tasks.where((t) => t['status'] != 'completed').length;
+      total = tasks.length;
+      completed = tasks.where((t) => t['status'] == 'completed').length;
+      pending = total - completed;
+    }
 
-    setState(() {});
+    setState(() => loading = false);
   }
 
+  // =====================
+  // CREATE TASK
+  // =====================
   Future<void> addTask(String title, String description) async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
+    final response = await http.post(
+      Uri.parse("$baseUrl/member/tasks"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({"title": title, "description": description}),
+    );
 
-    await supabase.from('tasks').insert({
-      'title': title,
-      'description': description,
-      'status': 'pending',
-      'member_id': user.id,
-    });
+    if (response.statusCode == 201) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Task created successfully")),
+      );
+      fetchTasks();
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Failed to create task")));
+    }
+  }
 
+  // =====================
+  // UPDATE PROGRESS
+  // =====================
+  Future<void> updateProgress(String id, int progress) async {
+    await http.patch(
+      Uri.parse("$baseUrl/tasks/$id/progress"),
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({"progress": progress}),
+    );
     fetchTasks();
   }
 
-  Future<void> updateStatus(String id, String status) async {
-    await supabase.from('tasks').update({'status': status}).eq('id', id);
-
-    fetchTasks();
-  }
-
+  // =====================
+  // DELETE TASK
+  // =====================
   Future<void> deleteTask(String id) async {
-    await supabase.from('tasks').delete().eq('id', id);
+    await http.delete(
+      Uri.parse("$baseUrl/tasks/$id"),
+      headers: {"Authorization": "Bearer $token"},
+    );
     fetchTasks();
   }
 
+  // =====================
+  // ADD TASK DIALOG
+  // =====================
   void showAddTaskDialog() {
     final titleController = TextEditingController();
     final descController = TextEditingController();
@@ -96,52 +142,26 @@ class _MemberDashboardState extends State<MemberDashboard> {
           ),
           ElevatedButton(
             onPressed: () {
-              if (titleController.text.isNotEmpty) {
-                addTask(titleController.text, descController.text);
-                Navigator.pop(context);
-              }
+              addTask(titleController.text.trim(), descController.text.trim());
+              Navigator.pop(context);
             },
-            child: const Text("Save"),
+            child: const Text("Create"),
           ),
         ],
       ),
     );
   }
 
-  Widget summaryCard(String title, int value, Color color) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: SizedBox(
-        width: 110,
-        height: 90,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(title),
-            const SizedBox(height: 6),
-            Text(
-              value.toString(),
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
+  // =====================
+  // PIE CHART
+  // =====================
   Widget pieChart() {
     return PieChart(
       PieChartData(
-        sectionsSpace: 2,
-        centerSpaceRadius: 40,
         sections: [
           PieChartSectionData(
             value: completed.toDouble(),
-            title: "Done",
+            title: "Completed",
             color: Colors.green,
           ),
           PieChartSectionData(
@@ -154,6 +174,9 @@ class _MemberDashboardState extends State<MemberDashboard> {
     );
   }
 
+  // =====================
+  // UI
+  // =====================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -162,95 +185,112 @@ class _MemberDashboardState extends State<MemberDashboard> {
         onPressed: showAddTaskDialog,
         child: const Icon(Icons.add),
       ),
-      body: RefreshIndicator(
-        onRefresh: fetchTasks,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  summaryCard("Total", total, Colors.blue),
-                  summaryCard("Completed", completed, Colors.green),
-                  summaryCard("Pending", pending, Colors.orange),
-                ],
-              ),
-              const SizedBox(height: 20),
-              SizedBox(height: 200, child: pieChart()),
-              const SizedBox(height: 20),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  "My Tasks",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(height: 10),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: tasks.length,
-                itemBuilder: (context, index) {
-                  final task = tasks[index];
-
-                  final status = task['status'] ?? 'pending';
-
-                  return Card(
-                    child: ListTile(
-                      title: Text(task['title']),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(task['description'] ?? ''),
-                          const SizedBox(height: 4),
-                          Text(
-                            "Status: $status",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          DropdownButton<String>(
-                            value: status,
-                            items: const [
-                              DropdownMenuItem(
-                                value: 'pending',
-                                child: Text('Pending'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'in_progress',
-                                child: Text('In Progress'),
-                              ),
-                              DropdownMenuItem(
-                                value: 'completed',
-                                child: Text('Completed'),
-                              ),
-                            ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                updateStatus(task['id'], value);
-                              }
-                            },
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => deleteTask(task['id']),
-                          ),
-                        ],
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: fetchTasks,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _summary("Total", total, Colors.blue),
+                        _summary("Completed", completed, Colors.green),
+                        _summary("Pending", pending, Colors.orange),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(height: 200, child: pieChart()),
+                    const SizedBox(height: 20),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        "My Tasks",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  );
-                },
+                    const SizedBox(height: 10),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: tasks.length,
+                      itemBuilder: (context, index) {
+                        final task = tasks[index];
+                        return Card(
+                          child: ListTile(
+                            title: Text(task['title']),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(task['description'] ?? ""),
+                                Text("Status: ${task['status']}"),
+                                Text("Progress: ${task['progress']}%"),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                DropdownButton<int>(
+                                  value: task['progress'],
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 0,
+                                      child: Text("0%"),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 50,
+                                      child: Text("50%"),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 100,
+                                      child: Text("100%"),
+                                    ),
+                                  ],
+                                  onChanged: (v) =>
+                                      updateProgress(task['id'], v!),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () => deleteTask(task['id']),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
+            ),
+    );
+  }
+
+  Widget _summary(String label, int value, Color color) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Text(label),
+            Text(
+              value.toString(),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
         ),
       ),
     );
