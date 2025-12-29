@@ -4,14 +4,13 @@ import RoleProtectedRoute from "./auth/RoleProtectedRoute";
 import Login from "./auth/Login";
 import Signup from "./auth/Signup";
 import VerifyOtp from "./auth/VerifyOtp";
-import CompleteProfile from "./auth/CompleteProfile";
 
 import AuthLayout from "./layouts/AuthLayout";
 import AppLayout from "./layouts/AppLayout";
 
 import AdminAnalytics from "./admin/AdminAnalytics";
 
-import Reports from "./reports/reports";
+import Reports from "./reports/Reports";
 import AdminDashboard from "./admin/AdminDashboard";
 import GroupDetails from "./admin/GroupDetails";
 
@@ -26,7 +25,6 @@ export default function App() {
         <Route path="/auth/login" element={<Login />} />
         <Route path="/auth/signup" element={<Signup />} />
         <Route path="/auth/verify" element={<VerifyOtp />} />
-        <Route path="/auth/complete-profile" element={<CompleteProfile />} />
       </Route>
 
       {/* PROTECTED APP ROUTES */}

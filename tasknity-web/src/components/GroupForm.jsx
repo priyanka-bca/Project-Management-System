@@ -1,75 +1,120 @@
-import React, { useState } from "react";
-import toast from "react-hot-toast";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function GroupForm({ addGroup }) {
-  const [groupName, setGroupName] = useState("");
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
   const [members, setMembers] = useState("");
 
-  const handleSubmit = (e) => {
+  const submit = (e) => {
     e.preventDefault();
 
-    if (!groupName.trim()) {
-      toast.error("Group name cannot be empty");
-      return;
-    }
-
-    const newGroup = {
+    addGroup({
       id: crypto.randomUUID(),
-      name: groupName,
+      name,
       members: members
         ? members.split(",").map((m) => m.trim())
         : [],
       approved: false,
-      leaderId: "",
-    };
+    });
 
-    addGroup(newGroup);
-    toast.success(`Group "${groupName}" created successfully!`);
-
-    setGroupName("");
+    setName("");
     setMembers("");
+    setOpen(false);
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-white p-6 rounded-lg shadow border space-y-4"
-    >
-      <h3 className="text-xl font-semibold text-gray-700">
-        Create New Group
-      </h3>
-
-      <div>
-        <label className="text-sm font-medium text-gray-600">Group Name *</label>
-        <input
-          type="text"
-          className="w-full p-2 border rounded mt-1"
-          value={groupName}
-          onChange={(e) => setGroupName(e.target.value)}
-          placeholder="Enter group name"
-          required
-        />
-      </div>
-
-      <div>
-        <label className="text-sm font-medium text-gray-600">
-          Members (comma separated)
-        </label>
-        <input
-          type="text"
-          className="w-full p-2 border rounded mt-1"
-          value={members}
-          onChange={(e) => setMembers(e.target.value)}
-          placeholder="e.g. John, Sara, Peter"
-        />
-      </div>
-
+    <>
+      {/* Toggle Button */}
       <button
-        type="submit"
-        className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 transition"
+        onClick={() => setOpen(!open)}
+        className="
+          bg-blue-600
+          text-white
+          px-5
+          py-2
+          rounded-lg
+          hover:bg-blue-700
+          active:scale-95
+          transition
+        "
       >
-        + Create Group
+        {open ? "Close Form" : "+ Create Group"}
       </button>
-    </form>
+
+      {/* Animated Form */}
+      <AnimatePresence>
+        {open && (
+          <motion.form
+            onSubmit={submit}
+            initial={{ opacity: 0, y: -15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25 }}
+            className="
+              mt-4
+              bg-white
+              p-5
+              rounded-xl
+              border
+              shadow-lg
+              space-y-4
+              max-w-md
+            "
+          >
+            <h3 className="text-lg font-semibold">Create New Group</h3>
+
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Group name"
+              required
+              className="
+                w-full
+                border
+                rounded
+                px-3
+                py-2
+                focus:outline-none
+                focus:ring-2
+                focus:ring-blue-500
+              "
+            />
+
+            <input
+              value={members}
+              onChange={(e) => setMembers(e.target.value)}
+              placeholder="Members (comma separated)"
+              className="
+                w-full
+                border
+                rounded
+                px-3
+                py-2
+                focus:outline-none
+                focus:ring-2
+                focus:ring-blue-500
+              "
+            />
+
+            <button
+              type="submit"
+              className="
+                w-full
+                bg-green-600
+                text-white
+                py-2
+                rounded-lg
+                hover:bg-green-700
+                active:scale-95
+                transition
+              "
+            >
+              Create Group
+            </button>
+          </motion.form>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

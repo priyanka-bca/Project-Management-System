@@ -1,44 +1,33 @@
 import { Navigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { supabase } from "../supabase";
+import { useAuth } from "../context/AuthContext";
 
 export default function RoleProtectedRoute({ allowedRole, children }) {
-  const [loading, setLoading] = useState(true);
-  const [allowed, setAllowed] = useState(false);
+  const { user, role, loading } = useAuth();
 
-  useEffect(() => {
-    checkRole();
-  }, []);
+  // ⏳ wait for auth check
+  if (loading) {
+    return <p className="p-6">Checking access...</p>;
+  }
 
-  const checkRole = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+  // 🔒 not logged in
+  if (!user) {
+    return <Navigate to="/auth/login" replace />;
+  }
 
-    if (!user) {
-      setAllowed(false);
-      setLoading(false);
-      return;
-    }
+  // ⏳ role still loading
+  if (!role) {
+    return <p className="p-6">Loading role...</p>;
+  }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+  // 🚫 role mismatch
+  if (allowedRole && role !== allowedRole) {
+    if (role === "admin") return <Navigate to="/" replace />;
+    if (role === "member") return <Navigate to="/member/dashboard" replace />;
+    if (role === "leader") return <Navigate to="/dashboard" replace />;
 
-    if (profile?.role === allowedRole) {
-      setAllowed(true);
-    } else {
-      setAllowed(false);
-    }
+    return <Navigate to="/auth/login" replace />;
+  }
 
-    setLoading(false);
-  };
-
-  if (loading) return <p className="p-6">Checking access...</p>;
-
-  if (!allowed) return <Navigate to="/auth/login" replace />;
-
+  // ✅ allowed
   return children;
 }

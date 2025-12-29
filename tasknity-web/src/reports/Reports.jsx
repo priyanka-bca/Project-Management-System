@@ -10,7 +10,7 @@ export default function Reports() {
   }, []);
 
   const loadTasks = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("tasks")
       .select(`
         id,
@@ -18,87 +18,132 @@ export default function Reports() {
         status,
         due_at,
         profiles ( name )
-      `);
+      `)
+      .order("due_at", { ascending: true });
 
-    if (!error) setTasks(data || []);
+    setTasks(data || []);
     setLoading(false);
   };
 
   const today = new Date();
 
-  const completed = tasks.filter((t) => t.status === "completed");
+  const completed = tasks.filter(t => t.status === "completed");
   const pending = tasks.filter(
-    (t) =>
-      t.status !== "completed" &&
-      new Date(t.due_at) >= today
+    t => t.status !== "completed" && new Date(t.due_at) >= today
   );
   const overdue = tasks.filter(
-    (t) =>
-      t.status !== "completed" &&
-      new Date(t.due_at) < today
+    t => t.status !== "completed" && new Date(t.due_at) < today
   );
 
-  if (loading) return <p className="p-6">Loading reports...</p>;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+        Loading…
+      </div>
+    );
+  }
 
   return (
-    <main className="max-w-6xl mx-auto p-6 space-y-8">
-      <h1 className="text-2xl font-bold">Task Reports</h1>
+    /* STRONG BACKGROUND */
+    <div className="min-h-screen bg-gray-900 p-8">
+      <main className="max-w-7xl mx-auto">
+        
+        {/* BIG CARD CONTAINER */}
+        <div className="relative bg-white rounded-xl shadow-2xl border-4 border-indigo-600">
 
-      {/* SUMMARY */}
-      <div className="grid grid-cols-3 gap-4">
-        <SummaryCard title="Completed" count={completed.length} color="green" />
-        <SummaryCard title="Pending" count={pending.length} color="yellow" />
-        <SummaryCard title="Overdue" count={overdue.length} color="red" />
-      </div>
+          {/* ACCENT BAR */}
+          <div className="absolute top-0 left-0 h-full w-2 bg-indigo-600 rounded-l-xl" />
 
-      {/* TABLE */}
-      <div className="bg-white border rounded shadow p-4">
-        <h2 className="font-semibold mb-4">All Tasks</h2>
+          <div className="p-8 space-y-10">
 
-        {tasks.length === 0 ? (
-          <p className="text-gray-500">No tasks found.</p>
-        ) : (
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left p-2">Task</th>
-                <th className="text-left p-2">Assigned To</th>
-                <th className="text-left p-2">Due Date</th>
-                <th className="text-left p-2">Status</th>
-              </tr>
-            </thead>
+            {/* HEADER */}
+            <header className="flex justify-between items-center border-b pb-4">
+              <h1 className="text-3xl font-extrabold text-gray-800">
+                TASK REPORTS
+              </h1>
+              <span className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold">
+                TOTAL {tasks.length}
+              </span>
+            </header>
 
-            <tbody>
-              {tasks.map((t) => (
-                <tr key={t.id} className="border-b">
-                  <td className="p-2">{t.title}</td>
-                  <td className="p-2">
-                    {t.profiles?.name || "—"}
-                  </td>
-                  <td className="p-2">{t.due_at}</td>
-                  <td className="p-2 capitalize">{t.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </main>
+            {/* SUMMARY */}
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <SummaryCard title="Completed" count={completed.length} color="green" />
+              <SummaryCard title="Pending" count={pending.length} color="yellow" />
+              <SummaryCard title="Overdue" count={overdue.length} color="red" />
+            </section>
+
+            {/* TABLE BLOCK */}
+            <section className="border-2 rounded-lg overflow-hidden">
+              <div className="bg-gray-100 px-6 py-3 font-bold">
+                ALL TASKS
+              </div>
+
+              <table className="w-full">
+                <thead className="bg-gray-200 text-sm">
+                  <tr>
+                    <th className="p-3 text-left">Task</th>
+                    <th className="p-3 text-left">Assigned</th>
+                    <th className="p-3 text-left">Due</th>
+                    <th className="p-3 text-left">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tasks.map(t => (
+                    <tr
+                      key={t.id}
+                      className="border-t hover:bg-indigo-50"
+                    >
+                      <td className="p-3 font-semibold">{t.title}</td>
+                      <td className="p-3">{t.profiles?.name || "—"}</td>
+                      <td className="p-3">{formatDate(t.due_at)}</td>
+                      <td className="p-3">
+                        <StatusBadge status={t.status} due_at={t.due_at} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }
 
-/* -------- SUMMARY CARD -------- */
+/* SUMMARY CARD */
 function SummaryCard({ title, count, color }) {
   const colors = {
-    green: "bg-green-100 text-green-700",
-    yellow: "bg-yellow-100 text-yellow-700",
-    red: "bg-red-100 text-red-700",
+    green: "border-green-500 text-green-700",
+    yellow: "border-yellow-500 text-yellow-700",
+    red: "border-red-500 text-red-700",
   };
 
   return (
-    <div className={`p-4 rounded shadow ${colors[color]}`}>
-      <p className="text-sm font-medium">{title}</p>
-      <p className="text-2xl font-bold">{count}</p>
+    <div className={`border-4 rounded-lg p-6 ${colors[color]} bg-white`}>
+      <p className="font-bold uppercase text-sm">{title}</p>
+      <p className="text-4xl font-extrabold mt-2">{count}</p>
     </div>
   );
+}
+
+/* STATUS BADGE */
+function StatusBadge({ status, due_at }) {
+  const overdue =
+    status !== "completed" && new Date(due_at) < new Date();
+
+  if (status === "completed")
+    return <span className="font-bold text-green-600">COMPLETED</span>;
+
+  if (overdue)
+    return <span className="font-bold text-red-600">OVERDUE</span>;
+
+  return <span className="font-bold text-yellow-600">PENDING</span>;
+}
+
+/* DATE FORMAT */
+function formatDate(date) {
+  return new Date(date).toLocaleDateString();
 }

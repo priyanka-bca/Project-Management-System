@@ -1,60 +1,66 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import TaskList from "./TaskList";
 import { supabase } from "../supabase";
+import TaskList from "./TaskList";
 
 export default function GroupDetails() {
   const { groupId } = useParams();
 
   const [group, setGroup] = useState(null);
   const [members, setMembers] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Task modal
+  /* TASK MODAL */
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskUser, setTaskUser] = useState(null);
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [dueDate, setDueDate] = useState("");
 
-  /* ---------------- LOAD DATA ---------------- */
-
   useEffect(() => {
     loadGroup();
     loadMembers();
+    loadTasks();
   }, [groupId]);
 
+  /* ---------------- LOAD DATA ---------------- */
   const loadGroup = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("groups")
       .select("*")
       .eq("id", groupId)
       .single();
 
-    if (!error) setGroup(data);
+    setGroup(data);
     setLoading(false);
   };
 
   const loadMembers = async () => {
     const { data } = await supabase
       .from("group_members")
-      .select(`
-        id,
-        profiles (
-          id,
-          name
-        )
-      `)
+      .select(`id, profiles ( id, name )`)
       .eq("group_id", groupId);
 
     setMembers(data || []);
   };
 
-  /* ---------------- ADD TASK ---------------- */
+  const loadTasks = async () => {
+    const { data } = await supabase
+      .from("tasks")
+      .select("*")
+      .eq("group_id", groupId);
 
+    setTasks(data || []);
+  };
+
+  /* ---------------- TASK FILTERS ---------------- */
+  const completedTasks = tasks.filter((t) => t.status === "completed");
+  const pendingTasks = tasks.filter((t) => t.status === "pending");
+
+  /* ---------------- ADD TASK ---------------- */
   const handleAddTask = async (e) => {
     e.preventDefault();
-
     if (!taskUser) return;
 
     await supabase.from("tasks").insert({
@@ -66,88 +72,106 @@ export default function GroupDetails() {
       status: "pending",
     });
 
-    // reset
     setTitle("");
     setDesc("");
     setDueDate("");
     setTaskUser(null);
     setShowTaskModal(false);
+
+    loadTasks(); // refresh tasks
   };
 
-  /* ---------------- UI ---------------- */
-
-  if (loading) return <p className="p-6">Loading...</p>;
-  if (!group) return <p className="p-6 text-red-600">Group not found</p>;
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-500">
+        Loading…
+      </div>
+    );
 
   return (
-    <main className="max-w-5xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Group Details</h1>
+    <div className="min-h-screen bg-slate-100">
+      {/* HEADER */}
+      <header className="bg-white rounded-2xl border shadow-sm p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-4xl font-bold text-slate-900">{group.name}</h1>
+          <p className="mt-1 text-sm text-slate-500">Group dashboard overview</p>
+        </div>
 
-      {/* GROUP INFO */}
-      <div className="bg-white p-4 border rounded shadow">
-        <p className="text-lg font-semibold">
-          Group: <span className="text-blue-600">{group.name}</span>
-        </p>
-        <p className="text-gray-600">
-          Project: {group.project_name}
-        </p>
-      </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full">
+            {group.project_name}
+          </span>
+          <span className="text-sm text-slate-500">Members: {members.length}</span>
+        </div>
+      </header>
 
-      {/* MEMBERS */}
-      <div className="bg-white p-4 border rounded shadow">
-        <h2 className="font-semibold mb-3">Members</h2>
+      <main className="max-w-7xl mx-auto px-6 space-y-10">
 
-        {members.length === 0 ? (
-          <p className="text-gray-500">No members added yet.</p>
-        ) : (
-          <ul className="space-y-2">
-            {members.map((m) => (
-              <li
-                key={m.id}
-                className="border p-2 rounded flex justify-between items-center"
-              >
-                <span>{m.profiles.name}</span>
+        {/* STATS */}
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <StatCard label="Total Tasks" value={tasks.length} color="blue" />
+          <StatCard label="Pending" value={pendingTasks.length} color="yellow" />
+          <StatCard label="Completed" value={completedTasks.length} color="green" />
+        </section>
 
-                <button
-                  onClick={() => {
-                    setTaskUser(m.profiles);
-                    setShowTaskModal(true);
-                  }}
-                  className="text-blue-600 hover:underline"
-                >
-                  ➕ Add Task
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+        {/* MEMBERS */}
+        <section className="bg-white rounded-2xl border shadow-sm p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-medium text-slate-800">Members</h2>
+            <span className="text-sm text-slate-400">{members.length} total</span>
+          </div>
 
-      {/* TASK LIST */}
-      <div className="bg-white p-4 border rounded shadow">
-        <h2 className="font-semibold mb-3">Tasks</h2>
+          {members.length === 0 ? (
+            <EmptyState text="No members added yet" />
+          ) : (
+            <ul className="divide-y">
+              {members.map((m) => (
+                <li key={m.id} className="py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={m.profiles.name} />
+                    <span className="text-slate-700">{m.profiles.name}</span>
+                  </div>
 
-        <TaskList groupId={groupId} />
-      </div>
+                  <button
+                    onClick={() => {
+                      setTaskUser(m.profiles);
+                      setShowTaskModal(true);
+                    }}
+                    className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                  >
+                    + Assign Task
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
+        {/* TASKS */}
+        <section className="bg-white rounded-2xl border shadow-sm p-6">
+          <h2 className="text-lg font-medium text-slate-800 mb-4">Tasks</h2>
+          <TaskList groupId={groupId} />
+        </section>
+      </main>
 
       {/* TASK MODAL */}
       {showTaskModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="absolute inset-0" onClick={() => setShowTaskModal(false)} />
           <form
             onSubmit={handleAddTask}
-            className="bg-white p-6 rounded shadow w-96 space-y-4"
+            className="relative z-10 w-full max-w-md rounded-2xl bg-white p-8 shadow-xl space-y-5"
           >
-            <h3 className="font-semibold text-lg">
-              Assign Task to {taskUser.name}
-            </h3>
+            <div>
+              <h3 className="text-xl font-semibold text-slate-900">Assign Task</h3>
+              <p className="text-sm text-slate-500">To {taskUser.name}</p>
+            </div>
 
             <input
-              type="text"
               placeholder="Task title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full border p-2 rounded"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
               required
             />
 
@@ -155,28 +179,28 @@ export default function GroupDetails() {
               placeholder="Description"
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
-              className="w-full border p-2 rounded"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
             />
 
             <input
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full border p-2 rounded"
+              className="w-full rounded-lg border px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
               required
             />
 
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setShowTaskModal(false)}
-                className="px-4 py-2 bg-gray-200 rounded"
+                className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded"
+                className="px-5 py-2 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
               >
                 Save Task
               </button>
@@ -184,6 +208,40 @@ export default function GroupDetails() {
           </form>
         </div>
       )}
-    </main>
+    </div>
   );
+}
+
+/* ---------------- COMPONENTS ---------------- */
+
+function StatCard({ label, value, color }) {
+  const colors = {
+    blue: "bg-blue-100 text-blue-700",
+    yellow: "bg-yellow-100 text-yellow-700",
+    green: "bg-green-100 text-green-700",
+  };
+
+  return (
+    <div className={`rounded-2xl p-6 ${colors[color]} shadow-sm`}>
+      <p className="text-sm">{label}</p>
+      <p className="mt-2 text-3xl font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function Avatar({ name }) {
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2);
+  return (
+    <div className="h-9 w-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-semibold">
+      {initials}
+    </div>
+  );
+}
+
+function EmptyState({ text }) {
+  return <div className="py-16 text-center text-slate-500">{text}</div>;
 }

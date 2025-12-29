@@ -1,46 +1,85 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../supabase";
+import sha256 from "crypto-js/sha256";
 
 export default function VerifyOtp() {
   const [otp, setOtp] = useState("");
-  const { state } = useLocation();
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const location = useLocation();
   const navigate = useNavigate();
+  const email = location.state?.email;
 
-  const verifyOtp = async (e) => {
+  const handleVerify = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError("");
 
-    const { data } = await supabase
+    if (!email) {
+      setError("Email missing. Please sign up again.");
+      setLoading(false);
+      return;
+    }
+
+    const otpHash = sha256(otp).toString();
+
+    const { data, error } = await supabase
       .from("email_otps")
-      .select("*")
-      .eq("email", state.email)
-      .eq("otp", otp)
-      .gt("expires_at", new Date().toISOString())
+      .select("used, expires_at")
+      .eq("email", email)
+      .eq("otp_hash", otpHash)
+      .eq("used", false)
       .single();
 
-    if (!data) return alert("Invalid or expired OTP");
+    if (error || !data) {
+      setError("Invalid or expired OTP");
+      setLoading(false);
+      return;
+    }
 
+    // mark OTP as used
     await supabase
       .from("email_otps")
-      .update({ verified: true })
-      .eq("email", state.email);
+      .update({ used: true })
+      .eq("email", email)
+      .eq("otp_hash", otpHash);
 
-    navigate("/auth/complete-profile", { state: { email: state.email } });
+    navigate("/auth/login");
   };
 
   return (
-    <form onSubmit={verifyOtp} className="auth-card">
-      <h2>Verify OTP</h2>
+    <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 md:p-10">
+      <h1 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-6">
+        Verify OTP
+      </h1>
 
-      <input
-        type="text"
-        placeholder="6-digit OTP"
-        value={otp}
-        onChange={(e) => setOtp(e.target.value)}
-        required
-      />
+      <p className="text-center text-gray-600 mb-4">
+        Enter the code sent to <b>{email}</b>
+      </p>
 
-      <button type="submit">Verify</button>
-    </form>
+      {error && (
+        <p className="text-red-600 mb-4 text-center font-medium">{error}</p>
+      )}
+
+      <form onSubmit={handleVerify} className="flex flex-col gap-5">
+        <input
+          type="text"
+          placeholder="Enter OTP"
+          className="border border-gray-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center tracking-widest"
+          value={otp}
+          onChange={(e) => setOtp(e.target.value)}
+          required
+        />
+
+        <button
+          disabled={loading}
+          className="bg-indigo-600 text-white px-4 py-3 rounded-xl font-medium hover:bg-indigo-700 transition"
+        >
+          {loading ? "Verifying..." : "Verify OTP"}
+        </button>
+      </form>
+    </div>
   );
 }

@@ -18,30 +18,66 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between mb-6">
-        <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          + Create Group
-        </button>
-      </div>
+    <div className="min-h-screen bg-slate-100">
+      <main className="max-w-7xl mx-auto px-6 py-12">
 
-      {/* Group Cards */}
-      <div className="grid grid-cols-3 gap-4">
-        {groups.map((g) => (
-          <div
-            key={g.id}
-            onClick={() => navigate(`/admin/group/${g.id}`)}
-            className="cursor-pointer bg-white p-4 shadow rounded hover:shadow-lg"
-          >
-            <h2 className="font-semibold">{g.name}</h2>
-            <p className="text-sm text-gray-500">{g.project_name}</p>
+        {/* HEADER */}
+        <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10">
+          <div>
+            <h1 className="text-4xl font-semibold tracking-tight text-slate-900">
+              Admin Dashboard
+            </h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Manage groups and active projects
+            </p>
           </div>
-        ))}
-      </div>
+
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 transition"
+          >
+            + Create Group
+          </button>
+        </header>
+
+        {/* GROUP GRID */}
+        {groups.length === 0 ? (
+          <div className="rounded-2xl border border-dashed bg-white p-20 text-center text-slate-500">
+            No groups created yet
+          </div>
+        ) : (
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {groups.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => navigate(`/admin/group/${g.id}`)}
+                className="group relative text-left rounded-2xl bg-white p-7 shadow-sm border border-slate-200 hover:border-indigo-300 hover:shadow-md transition"
+              >
+                {/* Card Accent */}
+                <div className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-gradient-to-r from-indigo-500 to-indigo-400 opacity-0 group-hover:opacity-100 transition" />
+
+                <h2 className="text-xl font-medium text-slate-900 group-hover:text-indigo-600 transition">
+                  {g.name}
+                </h2>
+
+                <p className="mt-2 text-sm text-slate-500 leading-relaxed">
+                  {g.project_name || "No project assigned"}
+                </p>
+
+                <div className="mt-8 flex items-center justify-between">
+                  <span className="text-sm font-medium text-indigo-600">
+                    Open group →
+                  </span>
+
+                  <span className="text-xs text-slate-400">
+                    View details
+                  </span>
+                </div>
+              </button>
+            ))}
+          </section>
+        )}
+      </main>
 
       {showCreate && (
         <CreateGroupModal
