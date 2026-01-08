@@ -1,62 +1,52 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function Signup() {
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const { signUpWithEmail } = useAuth();
+  const { signUp } = useAuth();
   const navigate = useNavigate();
 
-  const handleSignup = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-    const result = await signUpWithEmail(email);
-    if (!result.success) {
-      setError(result.error.message);
-      setLoading(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    const res = await signUp(email, password);
+
+    if (!res.success) {
+      setError(res.error.message);
       return;
     }
 
     navigate("/auth/verify", { state: { email } });
-    setLoading(false);
   };
 
   return (
-    <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 md:p-10">
-      <h1 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-6">
-        Create Account
-      </h1>
+    <form onSubmit={submit} className="max-w-md mx-auto mt-24">
+      <h2 className="text-2xl font-bold mb-4">Sign Up</h2>
 
-      {error && <p className="text-red-600 mb-4 text-center">{error}</p>}
+      {error && <p className="text-red-600">{error}</p>}
 
-      <form onSubmit={handleSignup} className="flex flex-col gap-5">
-        <input
-          type="email"
-          placeholder="Email"
-          className="border border-gray-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <button
-          disabled={loading}
-          className="bg-indigo-600 text-white px-4 py-3 rounded-xl font-medium hover:bg-indigo-700 transition"
-        >
-          {loading ? "Sending OTP..." : "Send OTP"}
-        </button>
-      </form>
+      <input
+        type="email"
+        placeholder="Email"
+        className="border p-3 w-full mb-3"
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
 
-      <p className="mt-6 text-center text-gray-500 text-sm">
-        Already have an account?{" "}
-        <Link className="text-indigo-600 font-medium hover:underline" to="/auth/login">
-          Login
-        </Link>
-      </p>
-    </div>
+      <input
+        type="password"
+        placeholder="Password"
+        className="border p-3 w-full mb-3"
+        onChange={(e) => setPassword(e.target.value)}
+        required
+      />
+
+      <button className="bg-black text-white p-3 w-full">
+        Sign Up
+      </button>
+    </form>
   );
 }

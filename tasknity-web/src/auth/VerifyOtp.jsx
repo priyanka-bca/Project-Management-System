@@ -1,85 +1,58 @@
-import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { supabase } from "../supabase";
-import sha256 from "crypto-js/sha256";
+import { useAuth } from "../context/AuthContext";
 
 export default function VerifyOtp() {
+  const { verifyOtp } = useAuth();
+  const navigate = useNavigate();
+  const { state } = useLocation();
+
+  const email = state?.email;
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const location = useLocation();
-  const navigate = useNavigate();
-  const email = location.state?.email;
+  if (!email) return <p>Invalid access</p>;
 
-  const handleVerify = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
 
-    if (!email) {
-      setError("Email missing. Please sign up again.");
-      setLoading(false);
+    const res = await verifyOtp(email, otp);
+    if (!res.success) {
+      setError(res.error);
       return;
     }
 
-    const otpHash = sha256(otp).toString();
+    // create profile
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-    const { data, error } = await supabase
-      .from("email_otps")
-      .select("used, expires_at")
-      .eq("email", email)
-      .eq("otp_hash", otpHash)
-      .eq("used", false)
-      .single();
-
-    if (error || !data) {
-      setError("Invalid or expired OTP");
-      setLoading(false);
-      return;
-    }
-
-    // mark OTP as used
-    await supabase
-      .from("email_otps")
-      .update({ used: true })
-      .eq("email", email)
-      .eq("otp_hash", otpHash);
+    await supabase.from("profiles").insert({
+      id: user.id,
+      email,
+      role: "member",
+    });
 
     navigate("/auth/login");
   };
 
   return (
-    <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 md:p-10">
-      <h1 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-6">
-        Verify OTP
-      </h1>
+    <form onSubmit={submit} className="max-w-md mx-auto mt-24">
+      <h2 className="text-2xl font-bold mb-4">Verify OTP</h2>
 
-      <p className="text-center text-gray-600 mb-4">
-        Enter the code sent to <b>{email}</b>
-      </p>
+      {error && <p className="text-red-600">{error}</p>}
 
-      {error && (
-        <p className="text-red-600 mb-4 text-center font-medium">{error}</p>
-      )}
+      <input
+        placeholder="Enter OTP"
+        className="border p-3 w-full mb-3"
+        onChange={(e) => setOtp(e.target.value)}
+        required
+      />
 
-      <form onSubmit={handleVerify} className="flex flex-col gap-5">
-        <input
-          type="text"
-          placeholder="Enter OTP"
-          className="border border-gray-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center tracking-widest"
-          value={otp}
-          onChange={(e) => setOtp(e.target.value)}
-          required
-        />
-
-        <button
-          disabled={loading}
-          className="bg-indigo-600 text-white px-4 py-3 rounded-xl font-medium hover:bg-indigo-700 transition"
-        >
-          {loading ? "Verifying..." : "Verify OTP"}
-        </button>
-      </form>
-    </div>
+      <button className="bg-black text-white p-3 w-full">
+        Verify
+      </button>
+    </form>
   );
 }

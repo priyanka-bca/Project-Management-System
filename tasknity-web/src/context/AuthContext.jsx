@@ -10,23 +10,26 @@ export function AuthProvider({ children }) {
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 Listen to Supabase auth session
+  // Load session
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    const load = async () => {
+      const { data } = await supabase.auth.getSession();
       setUser(data.session?.user ?? null);
       setLoading(false);
-    });
+    };
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    load();
 
-    return () => subscription.unsubscribe();
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
-  // 🔹 Fetch role from profiles table
+  // Load role
   useEffect(() => {
     if (!user) {
       setRole(null);
@@ -43,63 +46,50 @@ export function AuthProvider({ children }) {
       });
   }, [user]);
 
-  // 🔹 Send OTP (signup only)
-  const signUpWithEmail = async (email) => {
-    try {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const otpHash = CryptoJS.SHA256(otp).toString();
+  // SIGNUP (create auth user + OTP)
+  const signUp = async (email, password) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
 
-      await supabase.from("email_otps").insert({
-        email,
-        otp_hash: otpHash,
-        used: false,
-        expires_at: new Date(Date.now() + 5 * 60 * 1000),
-      });
+    if (error) return { success: false, error };
 
-      console.log("OTP (testing):", otp);
-      return { success: true };
-    } catch (error) {
-      return { success: false, error };
-    }
+    // generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = CryptoJS.SHA256(otp).toString();
+
+    await supabase.from("email_otps").insert({
+      email,
+      otp_hash: otpHash,
+    });
+
+    console.log("OTP (dev):", otp); // replace with email sender later
+
+    return { success: true, email };
   };
 
-  // 🔹 Verify OTP
+  // VERIFY OTP
   const verifyOtp = async (email, otp) => {
-    try {
-      const otpHash = CryptoJS.SHA256(otp).toString();
+    const otpHash = CryptoJS.SHA256(otp).toString();
 
-      const { data } = await supabase
-        .from("email_otps")
-        .select("id, expires_at")
-        .eq("email", email)
-        .eq("otp_hash", otpHash)
-        .eq("used", false)
-        .maybeSingle();
+    const { data } = await supabase
+      .from("email_otps")
+      .select("id")
+      .eq("email", email)
+      .eq("otp_hash", otpHash)
+      .maybeSingle();
 
-      if (!data) {
-        return { success: false, error: { message: "Invalid OTP" } };
-      }
-
-      if (new Date(data.expires_at) < new Date()) {
-        return { success: false, error: { message: "OTP expired" } };
-      }
-
-      await supabase.from("email_otps").update({ used: true }).eq("id", data.id);
-      return { success: true };
-    } catch (error) {
-      return { success: false, error };
+    if (!data) {
+      return { success: false, error: "Invalid OTP" };
     }
+
+    return { success: true };
   };
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        role,
-        loading,
-        signUpWithEmail,
-        verifyOtp,
-      }}
+      value={{ user, role, loading, signUp, verifyOtp }}
     >
       {children}
     </AuthContext.Provider>

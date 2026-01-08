@@ -12,33 +12,27 @@ export default function MemberDashboard() {
   }, []);
 
   const loadMemberData = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
+    // 🔹 1. Get member's group (RLS handles user_id)
     const { data: memberRow } = await supabase
       .from("group_members")
       .select("group_id")
-      .eq("user_id", user.id)
-      .single();
+      .maybeSingle();
 
     if (!memberRow) {
       setLoading(false);
       return;
     }
 
+    // 🔹 2. Get group info (RLS ensures access)
     const { data: groupData } = await supabase
       .from("groups")
       .select("*")
-      .eq("id", memberRow.group_id)
-      .single();
+      .maybeSingle();
 
+    // 🔹 3. Get assigned tasks (RLS filters by assigned_to)
     const { data: taskData } = await supabase
       .from("tasks")
       .select("*")
-      .eq("assigned_to", user.id)
       .order("due_date", { ascending: true });
 
     setGroup(groupData);
@@ -69,7 +63,6 @@ export default function MemberDashboard() {
       transition={{ duration: 0.4 }}
       className="max-w-7xl mx-auto p-8 space-y-8"
     >
-      {/* HEADER */}
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold text-gray-800">
           My Workspace
@@ -79,7 +72,6 @@ export default function MemberDashboard() {
         </p>
       </div>
 
-      {/* PROJECT CARD */}
       <div className="bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-xl p-6 shadow-lg">
         <p className="text-sm uppercase opacity-80">Project</p>
         <h2 className="text-2xl font-semibold">{group.project_name}</h2>
@@ -88,7 +80,6 @@ export default function MemberDashboard() {
         </p>
       </div>
 
-      {/* TASKS */}
       <div className="bg-white rounded-xl shadow border">
         <div className="p-5 border-b">
           <h3 className="text-lg font-semibold text-gray-800">

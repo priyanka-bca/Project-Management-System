@@ -1,109 +1,72 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../supabase";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
 
-    try {
-      // ✅ 1️⃣ Sign in with Supabase (NO OTP CHECK)
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      if (error) {
-        setError(error.message);
-        setLoading(false);
-        return;
-      }
-
-      // ✅ 2️⃣ Fetch user role
-      let { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .maybeSingle();
-
-      // ✅ 3️⃣ Create profile if missing
-      if (!profile) {
-        const { data: newProfile } = await supabase
-          .from("profiles")
-          .insert({
-            id: data.user.id,
-            role: "member",
-          })
-          .select()
-          .single();
-
-        profile = newProfile;
-      }
-
-      // ✅ 4️⃣ Redirect based on role
-      if (profile.role === "admin") navigate("/");
-      else if (profile.role === "member") navigate("/member/dashboard");
-      else if (profile.role === "leader") navigate("/dashboard");
-      else navigate("/");
-
-    } catch (err) {
-      console.error(err);
-      setError("Something went wrong. Please try again.");
-    } finally {
-      setLoading(false);
+    if (error) {
+      setError(error.message);
+      return;
     }
+
+    const user = data.user;
+
+    // 🔹 fetch role
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !profile) {
+      setError("Profile not found");
+      return;
+    }
+
+    // 🔹 redirect by role
+    if (profile.role === "admin") navigate("/");
+    else if (profile.role === "member") navigate("/member/dashboard");
+    else if (profile.role === "leader") navigate("/dashboard");
+    else navigate("/auth/login");
   };
 
   return (
-    <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 md:p-10">
-      <h1 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-6">
-        Welcome Back
-      </h1>
+    <form onSubmit={submit} className="max-w-md mx-auto mt-24">
+      <h2 className="text-2xl font-bold mb-4">Login</h2>
 
-      {error && <p className="text-red-600 mb-4 text-center">{error}</p>}
+      {error && <p className="text-red-600">{error}</p>}
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        <input
-          type="email"
-          placeholder="Email"
-          className="border border-gray-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+      <input
+        type="email"
+        placeholder="Email"
+        className="border p-3 w-full mb-3"
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
 
-        <input
-          type="password"
-          placeholder="Password"
-          className="border border-gray-300 px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+      <input
+        type="password"
+        placeholder="Password"
+        className="border p-3 w-full mb-3"
+        onChange={(e) => setPassword(e.target.value)}
+        required
+      />
 
-        <button
-          disabled={loading}
-          className="bg-indigo-600 text-white px-4 py-3 rounded-xl font-medium hover:bg-indigo-700 transition"
-        >
-          {loading ? "Signing in..." : "Login"}
-        </button>
-      </form>
-
-      <p className="mt-6 text-center text-gray-500 text-sm">
-        Don’t have an account?{" "}
-        <Link
-          to="/auth/signup"
-          className="text-indigo-600 font-medium hover:underline"
-        >
-          Sign up
-        </Link>
-      </p>
-    </div>
+      <button className="bg-black text-white p-3 w-full">
+        Login
+      </button>
+    </form>
   );
 }
