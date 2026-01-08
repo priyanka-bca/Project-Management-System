@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-
 class BlockReasonScreen extends StatefulWidget {
   const BlockReasonScreen({super.key});
 
@@ -9,7 +8,32 @@ class BlockReasonScreen extends StatefulWidget {
 }
 
 class _BlockReasonScreenState extends State<BlockReasonScreen> {
-  final reason = TextEditingController();
+  final TextEditingController reason = TextEditingController();
+
+  @override
+  void dispose() {
+    reason.dispose(); // prevent memory leak
+    super.dispose();
+  }
+
+  void _submitIssue() {
+    if (reason.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please explain your issue before submitting"),
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Issue submitted successfully"),
+      ),
+    );
+
+    reason.clear();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +67,7 @@ class _BlockReasonScreenState extends State<BlockReasonScreen> {
                     borderRadius: BorderRadius.circular(15),
                   ),
                 ),
-                onPressed: () {},
+                onPressed: _submitIssue,
                 child: const Text(
                   "Submit Issue",
                   style: TextStyle(color: Colors.white),
