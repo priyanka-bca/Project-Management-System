@@ -1,6 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
 
@@ -12,8 +11,6 @@ class MemberDashboard extends StatefulWidget {
 }
 
 class _MemberDashboardState extends State<MemberDashboard> {
-  final String baseUrl = "http://192.168.10.105:5000";
-
   List<Map<String, dynamic>> tasks = [];
   bool loading = true;
 
@@ -21,67 +18,63 @@ class _MemberDashboardState extends State<MemberDashboard> {
   int completed = 0;
   int pending = 0;
 
-  String? token;
-
   @override
   void initState() {
     super.initState();
-    init();
-  }
-
-  Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    token = prefs.getString("token");
-    await fetchTasks();
+    fetchTasks();
   }
 
   // =====================
   // FETCH TASKS
   // =====================
   Future<void> fetchTasks() async {
-    if (token == null) return;
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
 
-    final response = await http.get(
-      Uri.parse("$baseUrl/member/tasks"),
-      headers: {
-        "Authorization": "Bearer $token",
-        "Content-Type": "application/json",
-      },
-    );
+      final data = await Supabase.instance.client
+          .from('tasks')
+          .select()
+          .eq('assigned_to', user.id);
 
-    if (response.statusCode == 200) {
-      tasks = List<Map<String, dynamic>>.from(jsonDecode(response.body));
-
-      total = tasks.length;
-      completed = tasks.where((t) => t['status'] == 'completed').length;
-      pending = total - completed;
+      setState(() {
+        tasks = List<Map<String, dynamic>>.from(data);
+        total = tasks.length;
+        completed = tasks.where((t) => t['status'] == 'completed').length;
+        pending = total - completed;
+        loading = false;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading tasks: $e')),
+      );
+      setState(() => loading = false);
     }
-
-    setState(() => loading = false);
   }
 
   // =====================
   // CREATE TASK
   // =====================
   Future<void> addTask(String title, String description) async {
-    final response = await http.post(
-      Uri.parse("$baseUrl/member/tasks"),
-      headers: {
-        "Authorization": "Bearer $token",
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({"title": title, "description": description}),
-    );
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
 
-    if (response.statusCode == 201) {
+      await Supabase.instance.client.from('tasks').insert({
+        'title': title,
+        'description': description,
+        'assigned_to': user.id,
+        'status': 'pending',
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Task created successfully")),
       );
       fetchTasks();
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Failed to create task")));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
     }
   }
 
@@ -89,26 +82,31 @@ class _MemberDashboardState extends State<MemberDashboard> {
   // UPDATE PROGRESS
   // =====================
   Future<void> updateProgress(String id, int progress) async {
-    await http.patch(
-      Uri.parse("$baseUrl/tasks/$id/progress"),
-      headers: {
-        "Authorization": "Bearer $token",
-        "Content-Type": "application/json",
-      },
-      body: jsonEncode({"progress": progress}),
-    );
-    fetchTasks();
+    try {
+      await Supabase.instance.client
+          .from('tasks')
+          .update({'progress': progress})
+          .eq('id', id);
+      fetchTasks();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    }
   }
 
   // =====================
   // DELETE TASK
   // =====================
   Future<void> deleteTask(String id) async {
-    await http.delete(
-      Uri.parse("$baseUrl/tasks/$id"),
-      headers: {"Authorization": "Bearer $token"},
-    );
-    fetchTasks();
+    try {
+      await Supabase.instance.client.from('tasks').delete().eq('id', id);
+      fetchTasks();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    }
   }
 
   // =====================
@@ -180,7 +178,23 @@ class _MemberDashboardState extends State<MemberDashboard> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Member Dashboard")),
+      appBar: AppBar(
+        title: const Text("Member Dashboard"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await Supabase.instance.client.auth.signOut();
+              await prefs.remove('token');
+              await prefs.remove('role');
+              if (mounted && context.mounted) {
+                Navigator.pushReplacementNamed(context, '/login');
+              }
+            },
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: showAddTaskDialog,
         child: const Icon(Icons.add),

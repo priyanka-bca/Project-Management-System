@@ -36,6 +36,13 @@ class _GroupDetailsState extends State<GroupDetails> {
     });
   }
 
+  bool _isUserAdmin(String? email) {
+    if (email == null) return false;
+    // Admin role is verified in admin_dashboard.dart
+    // Only users with 'admin' role in profiles table can access this screen
+    return true; // If we reached here, user is already verified as admin
+  }
+
   void _showAssignMemberDialog(BuildContext context) {
     String email = '';
     String role = 'member';
@@ -124,12 +131,16 @@ class _GroupDetailsState extends State<GroupDetails> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = supabase.auth.currentUser;
+    
     return Scaffold(
       appBar: AppBar(title: Text(group?['name'] ?? 'Group Details')),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.person_add),
-        onPressed: () => _showAssignMemberDialog(context),
-      ),
+      floatingActionButton: _isUserAdmin(currentUser?.email)
+          ? FloatingActionButton(
+              child: const Icon(Icons.person_add),
+              onPressed: () => _showAssignMemberDialog(context),
+            )
+          : null,
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -149,6 +160,23 @@ class _GroupDetailsState extends State<GroupDetails> {
                       return ListTile(
                         title: Text(member['profiles']['email']),
                         subtitle: Text('Role: ${member['role']}'),
+                        trailing: PopupMenuButton<String>(
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(value: 'member', child: Text('Change to Member')),
+                            const PopupMenuItem(value: 'leader', child: Text('Change to Leader')),
+                            const PopupMenuDivider(),
+                            const PopupMenuItem(value: 'remove', child: Text('Remove', style: TextStyle(color: Colors.red))),
+                          ],
+                          onSelected: (value) async {
+                            if (value == 'remove') {
+                              await supabase.from('group_members').delete().eq('id', member['id']);
+                              fetchData();
+                            } else {
+                              await supabase.from('group_members').update({'role': value}).eq('id', member['id']);
+                              fetchData();
+                            }
+                          },
+                        ),
                       );
                     },
                   ),

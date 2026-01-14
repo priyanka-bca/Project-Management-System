@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'update_progress.dart';
-import 'upload_document.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'member/update_progress.dart';
+import 'member/upload_document.dart';
 
 class MemberDashboard extends StatefulWidget {
   const MemberDashboard({super.key});
@@ -40,52 +41,60 @@ class _MemberDashboardState extends State<MemberDashboard> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
               await supabase.auth.signOut();
-              if (mounted) setState(() {});
+              await prefs.remove('token');
+              await prefs.remove('role');
+              if (mounted && context.mounted) {
+                Navigator.pushReplacementNamed(context, '/login');
+              }
             },
           )
         ],
       ),
-      body: ListView.builder(
-        itemCount: tasks.length,
-        itemBuilder: (_, i) {
-          final t = tasks[i];
-          return Card(
-            child: ListTile(
-              title: Text(t['title']),
-              subtitle: Text("Progress: ${t['progress']}%"),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.upload),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => UploadDocumentScreen(taskId: t['id']),
+      body: tasks.isEmpty
+          ? const Center(
+              child: Text('No tasks assigned yet'),
+            )
+          : ListView.builder(
+              itemCount: tasks.length,
+              itemBuilder: (_, i) {
+                final t = tasks[i];
+                return Card(
+                  child: ListTile(
+                    title: Text(t['title']),
+                    subtitle: Text("Progress: ${t['progress']}%"),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.upload),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => UploadDocumentScreen(taskId: t['id']),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => UpdateProgressScreen(taskId: t['id']),
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => UpdateProgressScreen(taskId: t['id']),
+                              ),
+                            );
+                            fetchTasks();
+                          },
                         ),
-                      );
-                      fetchTasks();
-                    },
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
-          );
-        },
-      ),
     );
   }
-}

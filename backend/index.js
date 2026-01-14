@@ -14,7 +14,7 @@ app.use(express.json());
 // =======================
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 // =======================
@@ -37,28 +37,78 @@ async function getUserFromAuthHeader(req) {
 // SIGNUP
 // =======================
 app.post("/signup", async (req, res) => {
-  const { email, password, role } = req.body;
+  const { email, password, fullName, role } = req.body;
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
+  try {
+    console.log(`[SIGNUP] Attempting to create user: ${email}`);
+    
+    // Create user with regular signup (for development, email verification is optional)
+    const { data, error } = await supabase.auth.signUp({
+      email: email,
+      password: password,
+    });
 
-  if (error) {
-    return res.status(400).json({ message: error.message });
+    if (error) {
+      console.error("[SIGNUP] Auth error:", error);
+      return res.status(400).json({ message: error.message });
+    }
+
+    console.log(`[SIGNUP] User created: ${data.user.id}`);
+
+    // Create profile
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: data.user.id,
+      full_name: fullName || email.split("@")[0],
+      email: email,
+      role: role || "member",
+    });
+
+    if (profileError) {
+      console.error("[SIGNUP] Profile error:", profileError);
+    } else {
+      console.log(`[SIGNUP] Profile created for: ${email}`);
+    }
+
+    res.json({ 
+      message: "Signup successful",
+      user: {
+        id: data.user.id,
+        email: data.user.email,
+      }
+    });
+  } catch (err) {
+    console.error("[SIGNUP] Exception:", err);
+    res.status(500).json({ message: err.message });
   }
-
-  await supabase.from("users").insert({
-    id: data.user.id,
-    email,
-    role,
-  });
-
-  res.json({ message: "Signup successful" });
 });
 
 // =======================
-// LOGIN
+// CONFIRM USER (Development only - bypass email verification)
+// =======================
+app.post("/confirm-user", async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    console.log(`[CONFIRM] Attempting to confirm user: ${email}`);
+
+    // Update user to mark email as confirmed
+    const { data, error } = await supabase.auth.admin.updateUserById(
+      email,  // Using email as identifier - may need to lookup user first
+      { email_confirm: true }
+    );
+
+    if (error) {
+      console.error("[CONFIRM] Error:", error);
+      return res.status(400).json({ message: error.message });
+    }
+
+    res.json({ message: "User confirmed" });
+  } catch (err) {
+    console.error("[CONFIRM] Exception:", err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // =======================
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;

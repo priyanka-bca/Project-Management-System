@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'reset_password.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'reset_password.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,49 +20,66 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
+    print('LOGIN ATTEMPT - Email: $email, Password: "$password" (length: ${password.length})');
+
     if (email.isEmpty || password.isEmpty) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Enter email and password')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter email and password')),
+      );
       return;
     }
 
     setState(() => _loading = true);
 
     try {
-      final url = Uri.parse("http://192.168.10.105:5000/login");
-
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'email': email, 'password': password}),
+      final supabase = Supabase.instance.client;
+      
+      final authResponse = await supabase.auth.signInWithPassword(
+        email: email,
+        password: password,
       );
 
-      if (!mounted) return;
-      final data = json.decode(response.body);
+      // Fetch user role from profiles table using email
+      String userRole = 'member';
+      try {
+        final profileData = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('email', email)
+            .maybeSingle();
 
-      if (response.statusCode == 200) {
-        final token = data['token'];
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', token);
-        await prefs.setString('role', data['user']['role']);
-
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Login successful!')));
-
-        Navigator.pushReplacementNamed(context, '/member-dashboard');
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['error'] ?? 'Login failed')),
-        );
+        if (profileData != null) {
+          userRole = profileData['role'] as String? ?? 'member';
+        }
+      } catch (e) {
+        print('Error fetching profile: $e');
+        // Silently continue with default role
       }
+
+      // Store token and role in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('token', authResponse.session?.accessToken ?? '');
+      await prefs.setString('role', userRole);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login successful!')),
+      );
+      
+      // Redirect to group dashboard for member and leader roles
+      Navigator.pushReplacementNamed(context, '/group-dashboard');
+      
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.message}')),
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     } finally {
       if (!mounted) return;
       setState(() => _loading = false);

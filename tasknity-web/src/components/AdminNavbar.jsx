@@ -8,7 +8,6 @@ export default function AdminNavbar() {
 
         <div className="flex gap-6 text-gray-700">
           <Link className="hover:text-blue-600" to="/">Groups</Link>
-          <Link className="hover:text-blue-600" to="/board">Task Board</Link>
           <Link className="hover:text-blue-600" to="/reports">Reports</Link>
           <Link className="hover:text-blue-600" to="/admin/analytics">Analytics</Link>
         </div>

@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   Future<void> _logout(BuildContext context) async {
+    final supabase = Supabase.instance.client;
     final prefs = await SharedPreferences.getInstance();
+    await supabase.auth.signOut();
     await prefs.remove('token');
-    Navigator.pushReplacementNamed(context, '/login');
+    await prefs.remove('role');
+    if (context.mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
   }
 
   @override

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -22,46 +21,86 @@ class _SignupScreenState extends State<SignupScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
+    print('SIGNUP ATTEMPT - Email: $email, Password: "$password" (length: ${password.length})');
+
     if (fullName.isEmpty || email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all fields')),
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password must be at least 6 characters')),
+      );
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final url = Uri.parse("http://192.168.10.105:5000/signup");
+      final supabase = Supabase.instance.client;
 
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'full_name': fullName,
-          'email': email,
-          'password': password,
-        }),
+      print('SIGNUP ATTEMPT - Email: $email, Password: "$password"');
+
+      // Generate OTP
+      final otp = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
+      print('Generated OTP: $otp');
+
+      // Sign up
+      final signupRes = await supabase.auth.signUp(
+        email: email,
+        password: password,
       );
 
-      final data = json.decode(response.body);
+      if (signupRes.user != null) {
+        print('User created: ${signupRes.user!.id}');
+        
+        // Store OTP temporarily in database
+        try {
+          await supabase.from('email_otps').insert({
+            'user_id': signupRes.user!.id,
+            'email': email,
+            'otp': otp,
+            'created_at': DateTime.now().toIso8601String(),
+          });
+          print('OTP stored in database');
+        } catch (e) {
+          print('OTP storage error: $e');
+        }
 
-      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Account created! OTP: $otp')),
+          );
+          Navigator.pushReplacementNamed(
+            context,
+            '/verify-email',
+            arguments: {
+              'email': email,
+              'fullName': fullName,
+              'userId': signupRes.user!.id,
+            },
+          );
+        }
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Signup successful! Please login.')),
-        );
-        Navigator.pushReplacementNamed(context, '/login');
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['error'] ?? 'Signup failed')),
+          SnackBar(content: Text('Error: ${e.message}')),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

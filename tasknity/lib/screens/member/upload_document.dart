@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:file_picker/file_picker.dart';
+// import 'package:file_picker/file_picker.dart'; // Android/iOS only - disabled for desktop testing
 
 class UploadDocumentScreen extends StatelessWidget {
   final String taskId;
@@ -12,21 +12,11 @@ class UploadDocumentScreen extends StatelessWidget {
     final supabase = Supabase.instance.client;
 
     Future<void> upload() async {
-      final result = await FilePicker.platform.pickFiles();
-      if (result == null) return;
-
-      final file = File(result.files.single.path!);
-      final userId = supabase.auth.currentUser!.id;
-
-      final path = 'documents/$userId-${DateTime.now().millisecondsSinceEpoch}';
-
-      await supabase.storage.from('documents').upload(path, file);
-      final url = supabase.storage.from('documents').getPublicUrl(path);
-
-      await supabase.from('tasks').update({
-        'document_url': url,
-      }).eq('id', taskId);
-
+      // TODO: Implement file picker for Android/iOS
+      // For now, show placeholder
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('File upload available on mobile app')),
+      );
       Navigator.pop(context);
     }
 

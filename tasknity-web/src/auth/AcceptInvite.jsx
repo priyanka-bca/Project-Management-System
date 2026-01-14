@@ -29,7 +29,7 @@ export default function AcceptInvite() {
       .single();
 
     if (!invite) {
-      navigate("/member/dashboard");
+      navigate("/");
       return;
     }
 
@@ -45,7 +45,7 @@ export default function AcceptInvite() {
       .update({ accepted: true })
       .eq("id", invite.id);
 
-    navigate("/member/dashboard");
+    navigate("/");
   };
 
   return (

@@ -17,6 +17,29 @@ export default function AdminDashboard() {
     setGroups(data || []);
   };
 
+  const handleDeleteGroup = async (groupId, groupName) => {
+    if (!window.confirm(`Are you sure you want to delete the group "${groupName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      // Delete all members in the group first
+      await supabase.from("group_members").delete().eq("group_id", groupId);
+      
+      // Delete all tasks in the group
+      await supabase.from("tasks").delete().eq("group_id", groupId);
+      
+      // Delete the group
+      await supabase.from("groups").delete().eq("id", groupId);
+      
+      // Refresh the list
+      await fetchGroups();
+      alert("Group deleted successfully");
+    } catch (error) {
+      alert("Failed to delete group: " + error.message);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100">
       <main className="max-w-7xl mx-auto px-6 py-12">
@@ -48,32 +71,48 @@ export default function AdminDashboard() {
         ) : (
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {groups.map((g) => (
-              <button
+              <div
                 key={g.id}
-                onClick={() => navigate(`/admin/group/${g.id}`)}
                 className="group relative text-left rounded-2xl bg-white p-7 shadow-sm border border-slate-200 hover:border-indigo-300 hover:shadow-md transition"
               >
                 {/* Card Accent */}
                 <div className="absolute inset-x-0 top-0 h-1 rounded-t-2xl bg-gradient-to-r from-indigo-500 to-indigo-400 opacity-0 group-hover:opacity-100 transition" />
 
-                <h2 className="text-xl font-medium text-slate-900 group-hover:text-indigo-600 transition">
-                  {g.name}
-                </h2>
+                {/* Delete Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteGroup(g.id, g.name);
+                  }}
+                  className="absolute top-4 right-4 text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition"
+                  title="Delete group"
+                >
+                  🗑️
+                </button>
 
-                <p className="mt-2 text-sm text-slate-500 leading-relaxed">
-                  {g.project_name || "No project assigned"}
-                </p>
+                <button
+                  onClick={() => navigate(`/admin/group/${g.id}`)}
+                  className="w-full text-left"
+                >
+                  <h2 className="text-xl font-medium text-slate-900 group-hover:text-indigo-600 transition">
+                    {g.name}
+                  </h2>
 
-                <div className="mt-8 flex items-center justify-between">
-                  <span className="text-sm font-medium text-indigo-600">
-                    Open group →
-                  </span>
+                  <p className="mt-2 text-sm text-slate-500 leading-relaxed">
+                    {g.project_name || "No project assigned"}
+                  </p>
 
-                  <span className="text-xs text-slate-400">
-                    View details
-                  </span>
-                </div>
-              </button>
+                  <div className="mt-8 flex items-center justify-between">
+                    <span className="text-sm font-medium text-indigo-600">
+                      Open group →
+                    </span>
+
+                    <span className="text-xs text-slate-400">
+                      View details
+                    </span>
+                  </div>
+                </button>
+              </div>
             ))}
           </section>
         )}

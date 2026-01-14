@@ -6,17 +6,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
 import 'screens/reset_password.dart';
-import 'screens/dashboard_screen.dart';
-import 'screens/leader/leader_dashboard.dart';
-import 'screens/member/member_dashboard.dart';
+import 'screens/verify_email_screen.dart';
+import 'screens/group_dashboard.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 🔴 REQUIRED: Supabase initialization
+  // Initialize Supabase
   await Supabase.initialize(
-    url: 'https://YOUR_PROJECT_ID.supabase.co',
-    anonKey: 'YOUR_PUBLIC_ANON_KEY',
+    url: 'https://zsangtjxipvxbwmdmzoy.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpzYW5ndGp4aXB2eGJ3bWRtem95Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2ODk4NjEsImV4cCI6MjA4MDI2NTg2MX0.Au7p0GmMwbraGu9LjhIejff76boX-WLs7j-VtwUk0Mw',
   );
 
   runApp(const TasknityApp());
@@ -38,10 +37,16 @@ class TasknityApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/signup': (context) => const SignupScreen(),
+        '/verify-email': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          return VerifyEmailScreen(
+            email: args?['email'] ?? '',
+            fullName: args?['fullName'] ?? '',
+            userId: args?['userId'] ?? '',
+          );
+        },
         '/reset-password': (context) => const ResetPasswordScreen(),
-        '/dashboard': (context) => const DashboardScreen(),
-        '/leader-dashboard': (context) => const LeaderDashboard(),
-        '/member-dashboard': (context) => const MemberDashboard(),
+        '/group-dashboard': (context) => const GroupDashboard(),
       },
     );
   }
@@ -83,10 +88,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
       );
     }
 
-    if (_role == 'leader') {
-      return const LeaderDashboard();
-    } else if (_role == 'member') {
-      return const MemberDashboard();
+    if (_role == 'leader' || _role == 'member') {
+      return const GroupDashboard();
     } else {
       return const LoginScreen();
     }

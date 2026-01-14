@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "../supabase";
 import TaskList from "./TaskList";
+import AssignMembersModal from "./AssignMembersModal";
+import Notifications from "./Notifications";
 
 export default function GroupDetails() {
   const { groupId } = useParams();
@@ -10,6 +12,9 @@ export default function GroupDetails() {
   const [members, setMembers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(null);
 
   /* TASK MODAL */
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -17,12 +22,45 @@ export default function GroupDetails() {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [openMenuId, setOpenMenuId] = useState(null);
 
   useEffect(() => {
+    loadCurrentUser();
     loadGroup();
     loadMembers();
     loadTasks();
   }, [groupId]);
+
+  /* ---------------- LOAD CURRENT USER ROLE ---------------- */
+  const loadCurrentUser = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data?.user) {
+      setCurrentUserId(data.user.id);
+      
+      // Get current user's role in this group
+      const { data: userRole } = await supabase
+        .from("group_members")
+        .select("role")
+        .eq("group_id", groupId)
+        .eq("user_id", data.user.id)
+        .single();
+
+      if (userRole) {
+        setCurrentUserRole(userRole.role);
+      } else {
+        // Check if user is admin (admins can manage all groups)
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+        
+        if (profile?.role === "admin") {
+          setCurrentUserRole("admin");
+        }
+      }
+    }
+  };
 
   /* ---------------- LOAD DATA ---------------- */
   const loadGroup = async () => {
@@ -39,7 +77,7 @@ export default function GroupDetails() {
   const loadMembers = async () => {
     const { data } = await supabase
       .from("group_members")
-      .select(`id, profiles ( id, name )`)
+      .select(`id, role, user_id, profiles ( id, full_name, email )`)
       .eq("group_id", groupId);
 
     setMembers(data || []);
@@ -57,6 +95,50 @@ export default function GroupDetails() {
   /* ---------------- TASK FILTERS ---------------- */
   const completedTasks = tasks.filter((t) => t.status === "completed");
   const pendingTasks = tasks.filter((t) => t.status === "pending");
+
+  /* ---------------- CHANGE MEMBER ROLE ---------------- */
+  const handleChangeRole = async (memberId, currentRole) => {
+    const newRole = currentRole === "member" ? "leader" : "member";
+
+    // Check if trying to add a leader when one already exists
+    if (newRole === "leader") {
+      const hasLeader = members.some((m) => m.role === "leader" && m.id !== memberId);
+      if (hasLeader) {
+        alert("This group already has a leader. Only one leader per group allowed.");
+        return;
+      }
+    }
+
+    try {
+      await supabase
+        .from("group_members")
+        .update({ role: newRole })
+        .eq("id", memberId);
+
+      loadMembers();
+    } catch (error) {
+      alert("Failed to update member role: " + error.message);
+    }
+  };
+
+  /* ---------------- REMOVE MEMBER FROM GROUP ---------------- */
+  const handleRemoveMember = async (memberId, memberName) => {
+    if (!window.confirm(`Are you sure you want to remove ${memberName} from this group?`)) {
+      return;
+    }
+
+    try {
+      await supabase
+        .from("group_members")
+        .delete()
+        .eq("id", memberId);
+
+      loadMembers();
+      loadTasks(); // Refresh tasks in case this member had tasks
+    } catch (error) {
+      alert("Failed to remove member: " + error.message);
+    }
+  };
 
   /* ---------------- ADD TASK ---------------- */
   const handleAddTask = async (e) => {
@@ -118,7 +200,14 @@ export default function GroupDetails() {
         <section className="bg-white rounded-2xl border shadow-sm p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-medium text-slate-800">Members</h2>
-            <span className="text-sm text-slate-400">{members.length} total</span>
+            {currentUserRole === "admin" && (
+              <button
+                onClick={() => setShowAddMemberModal(true)}
+                className="text-sm font-medium bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700"
+              >
+                + Add Member
+              </button>
+            )}
           </div>
 
           {members.length === 0 ? (
@@ -128,19 +217,67 @@ export default function GroupDetails() {
               {members.map((m) => (
                 <li key={m.id} className="py-3 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Avatar name={m.profiles.name} />
-                    <span className="text-slate-700">{m.profiles.name}</span>
+                    <Avatar name={m.profiles.full_name} />
+                    <div>
+                      <p className="text-slate-700 font-medium">{m.profiles.full_name}</p>
+                      <p className="text-xs text-slate-500">{m.profiles.email}</p>
+                      <p className="text-xs font-semibold mt-1 uppercase bg-slate-100 text-slate-700 px-2 py-0.5 rounded w-fit">
+                        {m.role}
+                      </p>
+                    </div>
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setTaskUser(m.profiles);
-                      setShowTaskModal(true);
-                    }}
-                    className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-                  >
-                    + Assign Task
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {(currentUserRole === "leader") && m.role === "member" && (
+                      <button
+                        onClick={() => {
+                          setTaskUser(m.profiles);
+                          setShowTaskModal(true);
+                        }}
+                        className="text-sm font-medium text-indigo-600 hover:text-indigo-700 px-2 py-1 rounded hover:bg-indigo-50"
+                      >
+                        + Task
+                      </button>
+                    )}
+
+                    {(currentUserRole === "admin") && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setOpenMenuId(openMenuId === m.id ? null : m.id)}
+                          className="text-slate-600 hover:text-slate-900 px-2 py-1 rounded hover:bg-slate-100"
+                          title="More options"
+                        >
+                          ⋮
+                        </button>
+
+                        {openMenuId === m.id && (
+                          <div className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
+                            <button
+                              onClick={() => {
+                                handleChangeRole(m.id, m.role);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 first:rounded-t-lg flex items-center gap-2"
+                            >
+                              👤 {m.role === "member" ? "Make Leader" : "Make Member"}
+                            </button>
+
+                            <div className="border-t border-slate-100"></div>
+
+                            <button
+                              onClick={() => {
+                                handleRemoveMember(m.id, m.profiles.full_name);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 last:rounded-b-lg flex items-center gap-2"
+                            >
+                              ✕ Remove from Group
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -151,6 +288,12 @@ export default function GroupDetails() {
         <section className="bg-white rounded-2xl border shadow-sm p-6">
           <h2 className="text-lg font-medium text-slate-800 mb-4">Tasks</h2>
           <TaskList groupId={groupId} />
+        </section>
+
+        {/* NOTIFICATIONS */}
+        <section className="bg-white rounded-2xl border shadow-sm p-6">
+          <h2 className="text-lg font-medium text-slate-800 mb-4">📢 Document Reminders</h2>
+          <Notifications />
         </section>
       </main>
 
@@ -164,7 +307,7 @@ export default function GroupDetails() {
           >
             <div>
               <h3 className="text-xl font-semibold text-slate-900">Assign Task</h3>
-              <p className="text-sm text-slate-500">To {taskUser.name}</p>
+              <p className="text-sm text-slate-500">To {taskUser.full_name}</p>
             </div>
 
             <input
@@ -207,6 +350,15 @@ export default function GroupDetails() {
             </div>
           </form>
         </div>
+      )}
+
+      {/* ADD MEMBER MODAL */}
+      {showAddMemberModal && (
+        <AssignMembersModal
+          groupId={groupId}
+          onClose={() => setShowAddMemberModal(false)}
+          onMemberAdded={loadMembers}
+        />
       )}
     </div>
   );

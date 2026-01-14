@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 class UpdateProgressScreen extends StatefulWidget {
-  const UpdateProgressScreen({super.key});
+  final String taskId;
+  const UpdateProgressScreen({super.key, required this.taskId});
 
   @override
   State<UpdateProgressScreen> createState() => _UpdateProgressScreenState();

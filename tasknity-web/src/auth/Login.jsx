@@ -37,9 +37,10 @@ export default function Login() {
 
     // 🔹 redirect by role
     if (profile.role === "admin") navigate("/");
-    else if (profile.role === "member") navigate("/member/dashboard");
-    else if (profile.role === "leader") navigate("/dashboard");
-    else navigate("/auth/login");
+    else {
+      setError("Access denied: Admin only");
+      return;
+    }
   };
 
   return (

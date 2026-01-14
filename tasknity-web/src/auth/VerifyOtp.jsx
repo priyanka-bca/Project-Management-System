@@ -23,7 +23,7 @@ export default function VerifyOtp() {
       return;
     }
 
-    // create profile
+    // create profile with admin role
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -31,7 +31,7 @@ export default function VerifyOtp() {
     await supabase.from("profiles").insert({
       id: user.id,
       email,
-      role: "member",
+      role: "admin",  // React app creates admin accounts only
     });
 
     navigate("/auth/login");

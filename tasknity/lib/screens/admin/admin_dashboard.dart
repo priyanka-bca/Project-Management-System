@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'group_details.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -19,7 +20,51 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void initState() {
     super.initState();
-    fetchData();
+    _checkAdminAccess();
+  }
+
+  Future<void> _checkAdminAccess() async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null) {
+        Navigator.pushReplacementNamed(context, '/login');
+        return;
+      }
+
+      // Try to fetch role, but if it fails, assume member role
+      String role = 'member';
+      try {
+        final profiles = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id);
+        
+        if (profiles.isNotEmpty) {
+          role = profiles[0]['role'] as String? ?? 'member';
+        }
+      } catch (e) {
+        print('Role fetch failed: $e, using default member role');
+      }
+
+      if (role != 'admin') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Access denied: Admin only')),
+          );
+          Navigator.pushReplacementNamed(context, '/login');
+        }
+        return;
+      }
+
+      fetchData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+        Navigator.pushReplacementNamed(context, '/login');
+      }
+    }
   }
 
   Future<void> fetchData() async {
@@ -87,8 +132,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
               await supabase.auth.signOut();
-              if (mounted) setState(() {});
+              await prefs.remove('token');
+              await prefs.remove('role');
+              if (mounted && context.mounted) {
+                Navigator.pushReplacementNamed(context, '/login');
+              }
             },
           ),
         ],
