@@ -51,15 +51,16 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           .select()
           .eq('user_id', widget.userId)
           .eq('otp', otp)
-          .single();
+          .maybeSingle();
 
       if (response != null) {
-        // OTP is valid, create the profile
-        await supabase.from('profiles').insert({
+        // OTP is valid, create or update the profile with email_verified = true
+        await supabase.from('profiles').upsert({
           'id': widget.userId,
           'full_name': widget.fullName,
           'email': widget.email,
           'role': 'member',
+          'email_verified': true,  // Mark as verified
         });
 
         // Delete the used OTP
@@ -73,11 +74,16 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           const SnackBar(content: Text('Email verified successfully!')),
         );
         Navigator.pushReplacementNamed(context, '/login');
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid OTP')),
+        );
       }
     } on PostgrestException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Invalid OTP: ${e.message}')),
+        SnackBar(content: Text('Error: ${e.message}')),
       );
     } catch (e) {
       if (!mounted) return;
