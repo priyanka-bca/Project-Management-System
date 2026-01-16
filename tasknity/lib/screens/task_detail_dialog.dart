@@ -11,12 +11,12 @@ class TaskDetailDialog extends StatefulWidget {
   final String? currentUserRole;
 
   const TaskDetailDialog({
-    Key? key,
+    super.key,
     required this.task,
     required this.onUploadSuccess,
     this.groupLeaderId,
     this.currentUserRole,
-  }) : super(key: key);
+  });
 
   @override
   State<TaskDetailDialog> createState() => _TaskDetailDialogState();
@@ -108,15 +108,8 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
     }
   }
 
-  Future<void> _checkForUploadedDocument() async {
-    try {
-      // Legacy method - now replaced by _fetchSubmissions
-      await _fetchSubmissions();
-    } catch (e) {
-      print('Error checking submission: $e');
-
-    }
-  }
+  // Legacy method - now replaced by _fetchSubmissions
+  // _checkForUploadedDocument() has been removed as it's not referenced
 
   void _uploadDocument() async {
     try {
@@ -324,7 +317,7 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
         ? DateTime.parse(widget.task['due_date'])
         : null;
     final daysLeft =
-        dueDate != null ? dueDate.difference(DateTime.now()).inDays : null;
+        dueDate?.difference(DateTime.now()).inDays;
     final isUrgent = daysLeft != null &&
         daysLeft <= 1 &&
         widget.task['document_submitted'] != true;
@@ -389,7 +382,7 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
             const SizedBox(height: 16),
 
             // Submission Status - Show all submissions with delete buttons
-            if (submissions != null && submissions.isNotEmpty)
+            if (submissions.isNotEmpty)
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -482,7 +475,7 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               )

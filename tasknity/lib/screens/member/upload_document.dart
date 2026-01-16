@@ -1,6 +1,4 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 // import 'package:file_picker/file_picker.dart'; // Android/iOS only - disabled for desktop testing
 
 class UploadDocumentScreen extends StatelessWidget {
@@ -9,8 +7,6 @@ class UploadDocumentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final supabase = Supabase.instance.client;
-
     Future<void> upload() async {
       // TODO: Implement file picker for Android/iOS
       // For now, show placeholder

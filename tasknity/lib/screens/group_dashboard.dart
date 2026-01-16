@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'task_detail_dialog.dart';
+import 'filtered_tasks_screen.dart';
 
 class GroupDashboard extends StatefulWidget {
   const GroupDashboard({super.key});
@@ -728,14 +729,6 @@ class _GroupDashboardState extends State<GroupDashboard> {
                         ],
                         // Task Stats
                         _buildStatsSection(),
-                        const SizedBox(height: 28),
-                        // Tasks Header
-                        _buildTasksHeader(),
-                        const SizedBox(height: 16),
-                        // Tasks List
-                        tasks.isEmpty
-                            ? _buildEmptyTasksState()
-                            : _buildTasksList(),
                       ],
                     ),
                 ],
@@ -802,58 +795,14 @@ class _GroupDashboardState extends State<GroupDashboard> {
     );
   }
 
-  Widget _buildProfileSection() {
-    final user = supabase.auth.currentUser;
-    final userName = user?.userMetadata?['full_name'] ?? user?.email?.split('@')[0] ?? 'User';
-    
-    return Row(
-      children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF00D4FF), Color(0xFFD946EF)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF00D4FF).withOpacity(0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Center(
-            child: Text(
-              userName[0].toUpperCase(),
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          userName,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-            letterSpacing: 0.2,
-          ),
-        ),
-      ],
-    );
-  }
+  // Unused method _buildProfileSection() removed
 
   Widget _buildGroupSelector() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final horizontalPadding = screenWidth * 0.05; // 5% padding on each side
+    
     return Container(
-      margin: const EdgeInsets.only(left: 32, right: 16),
+      margin: EdgeInsets.symmetric(horizontal: horizontalPadding),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [const Color(0xFF262F3D), const Color(0xFF1F2734)],
@@ -1147,16 +1096,22 @@ class _GroupDashboardState extends State<GroupDashboard> {
   }
 
   Widget _buildStatsSection() {
-    return Row(
-      children: [
-        Expanded(child: _buildStatCard('Total', total.toString(), const Color(0xFF00D4FF), Icons.assignment, 'all')),
-        const SizedBox(width: 12),
-        Expanded(child: _buildStatCard('Completed', completed.toString(), const Color(0xFF10B981), Icons.check_circle, 'completed')),
-        const SizedBox(width: 12),
-        Expanded(child: _buildStatCard('Pending', pending.toString(), const Color(0xFFF59E0B), Icons.schedule, 'pending')),
-        const SizedBox(width: 12),
-        Expanded(child: _buildStatCard('Overdue', overdue.toString(), const Color(0xFFEF4444), Icons.error_outline, 'overdue')),
-      ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.75,
+        children: [
+          _buildStatCard('Total', total.toString(), const Color(0xFF00D4FF), Icons.assignment, 'all'),
+          _buildStatCard('Completed', completed.toString(), const Color(0xFF10B981), Icons.check_circle, 'completed'),
+          _buildStatCard('Pending', pending.toString(), const Color(0xFFF59E0B), Icons.schedule, 'pending'),
+          _buildStatCard('Overdue', overdue.toString(), const Color(0xFFEF4444), Icons.error_outline, 'overdue'),
+        ],
+      ),
     );
   }
 
@@ -1413,15 +1368,21 @@ class _GroupDashboardState extends State<GroupDashboard> {
   }
 
   Widget _buildStatCard(String label, String value, Color color, IconData icon, String filterType) {
-    final isSelected = taskFilter == filterType;
     return GestureDetector(
       onTap: () {
-        setState(() {
-          taskFilter = filterType;
-        });
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FilteredTasksScreen(
+              groupId: selectedGroupId!,
+              filterType: filterType,
+              groupRole: groupRole,
+            ),
+          ),
+        );
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF262F3D), Color(0xFF1F2734)],
@@ -1430,32 +1391,26 @@ class _GroupDashboardState extends State<GroupDashboard> {
           ),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? color : color.withOpacity(0.3),
-            width: isSelected ? 2.5 : 1.5,
+            color: color.withOpacity(0.3),
+            width: 1.5,
           ),
           boxShadow: [
-            if (isSelected)
-              BoxShadow(
-                color: color.withOpacity(0.4),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              )
-            else
-              BoxShadow(
-                color: Colors.black.withOpacity(0.25),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.25),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            )
           ],
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(isSelected ? 0.3 : 0.2),
+                color: color.withOpacity(0.2),
                 shape: BoxShape.circle,
-                border: Border.all(color: color.withOpacity(isSelected ? 0.6 : 0.4), width: 1),
+                border: Border.all(color: color.withOpacity(0.4), width: 1),
               ),
               child: Icon(icon, color: color, size: 24),
             ),
@@ -1469,14 +1424,18 @@ class _GroupDashboardState extends State<GroupDashboard> {
                 letterSpacing: -0.5,
               ),
             ),
-          const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.3,
+            const SizedBox(height: 6),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
