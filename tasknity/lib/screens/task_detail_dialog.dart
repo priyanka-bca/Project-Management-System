@@ -8,12 +8,14 @@ class TaskDetailDialog extends StatefulWidget {
   final Map<String, dynamic> task;
   final VoidCallback onUploadSuccess;
   final String? groupLeaderId;
+  final String? currentUserRole;
 
   const TaskDetailDialog({
     Key? key,
     required this.task,
     required this.onUploadSuccess,
     this.groupLeaderId,
+    this.currentUserRole,
   }) : super(key: key);
 
   @override
@@ -23,11 +25,34 @@ class TaskDetailDialog extends StatefulWidget {
 class _TaskDetailDialogState extends State<TaskDetailDialog> {
   bool isUploading = false;
   List<Map<String, dynamic>> submissions = [];
+  String disapprovalReason = '';
+  bool isApproving = false;
 
   @override
   void initState() {
     super.initState();
     _fetchSubmissions();
+    _checkDeadlineAndNotify();
+  }
+
+  Future<void> _checkDeadlineAndNotify() async {
+    try {
+      final dueDate = widget.task['due_date'] != null
+          ? DateTime.parse(widget.task['due_date'])
+          : null;
+
+      // If deadline has passed and task is not completed and no document submitted
+      if (dueDate != null &&
+          DateTime.now().isAfter(dueDate) &&
+          widget.task['status'] != 'completed' &&
+          widget.task['document_submitted'] != true) {
+        
+        // Send notification to leader
+        await _notifyLeaderOfMissedDeadline();
+      }
+    } catch (e) {
+      print('Error checking deadline: $e');
+    }
   }
 
   Future<void> _fetchSubmissions() async {
@@ -39,10 +64,18 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
           .eq('task_id', widget.task['id'])
           .order('submitted_at', ascending: false);
       
-      if (results.isNotEmpty) {
-        setState(() {
-          submissions = List<Map<String, dynamic>>.from(results);
-        });
+      setState(() {
+        submissions = results.isNotEmpty 
+            ? List<Map<String, dynamic>>.from(results)
+            : [];
+      });
+      
+      // If no submissions left, reset task status
+      if (results.isEmpty && widget.task['document_submitted'] == true) {
+        await supabase.from('tasks').update({
+          'document_submitted': false,
+          'status': 'pending',
+        }).eq('id', widget.task['id']);
       }
     } catch (e) {
       print('Error fetching submissions: $e');
@@ -56,13 +89,15 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
           .delete()
           .eq('id', submissionId);
       
-      // Refresh list
+      // Refresh list (this will also reset status if no submissions left)
       await _fetchSubmissions();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('File removed')),
         );
+        // Trigger parent refresh
+        widget.onUploadSuccess();
       }
     } catch (e) {
       if (mounted) {
@@ -85,6 +120,23 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
 
   void _uploadDocument() async {
     try {
+      // Check if deadline has passed
+      final dueDate = widget.task['due_date'] != null
+          ? DateTime.parse(widget.task['due_date'])
+          : null;
+      
+      if (dueDate != null && DateTime.now().isAfter(dueDate)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Deadline has passed. Cannot upload documents after the due date.'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: false,
         type: FileType.any,
@@ -235,6 +287,37 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
     );
   }
 
+  Future<void> _notifyLeaderOfMissedDeadline() async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user == null || widget.groupLeaderId == null) return;
+
+      // Get group name
+      final groupData = await supabase
+          .from('groups')
+          .select('name')
+          .eq('id', widget.task['group_id'])
+          .single();
+
+      final groupName = groupData['name'] ?? 'Unknown Group';
+
+      // Create notification for the leader
+      await supabase.from('notifications').insert({
+        'user_id': widget.groupLeaderId,
+        'type': 'task_deadline_missed',
+        'title': 'Task Deadline Missed: ${widget.task['title']}',
+        'message': 'Member has not completed the task "${widget.task['title']}" in group "$groupName" by the due date (${widget.task['due_date']?.toString().split(' ')[0]}).',
+        'task_id': widget.task['id'],
+        'is_read': false,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      print('Notification sent to leader: ${widget.groupLeaderId}');
+    } catch (e) {
+      print('Error notifying leader: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dueDate = widget.task['due_date'] != null
@@ -275,10 +358,12 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Status: ${widget.task['status']?.toUpperCase() ?? 'PENDING'}',
+                    'Status: ${submissions.isNotEmpty 
+                      ? (widget.task['status'] == 'completed' ? 'COMPLETED' : 'SUBMITTED')
+                      : 'PENDING'}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  if (dueDate != null) ...[
+                  if (dueDate != null && submissions.isEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
                       'Due: ${dueDate.toLocal().toString().split(' ')[0]}',
@@ -423,7 +508,7 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
               ),
             const SizedBox(height: 16),
 
-            // Upload Progress or Button
+            // Upload Progress or Button (only for members, not leaders)
             if (isUploading)
               const Column(
                 children: [
@@ -432,7 +517,71 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
                   Text('Uploading...'),
                 ],
               )
+            else if (widget.currentUserRole == 'leader')
+              // Leader view: Download and approve/disapprove buttons
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (submissions.isNotEmpty)
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Download functionality coming soon')),
+                        );
+                      },
+                      icon: const Icon(Icons.download),
+                      label: const Text('Download Files'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'No documents submitted yet by the member',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.orange),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  if (submissions.isNotEmpty && widget.task['status'] != 'completed')
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: isApproving ? null : _approveSubmission,
+                            icon: const Icon(Icons.check_circle),
+                            label: const Text('Approve'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: isApproving ? null : _showDisapproveDialog,
+                            icon: const Icon(Icons.cancel),
+                            label: const Text('Disapprove'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              )
             else
+              // Member view: Upload button
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -472,5 +621,137 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
   @override
   void dispose() {
     super.dispose();
+  }
+
+  Future<void> _approveSubmission() async {
+    try {
+      setState(() => isApproving = true);
+
+      // Update task status to pending_admin_approval
+      await supabase.from('tasks').update({
+        'status': 'pending_admin_approval',
+        'leader_approved_at': DateTime.now().toIso8601String(),
+      }).eq('id', widget.task['id']);
+
+      // Get admin user (usually user with role 'admin')
+      // For now, we'll send to a default admin or system notification
+      final adminUsers = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'admin')
+          .limit(1);
+
+      if (adminUsers.isNotEmpty) {
+        final adminId = adminUsers[0]['user_id'];
+        
+        // Create notification for admin
+        await supabase.from('notifications').insert({
+          'user_id': adminId,
+          'type': 'task_pending_admin_approval',
+          'title': 'Task Pending Admin Approval: ${widget.task['title']}',
+          'message': 'Leader has approved the submission for task "${widget.task['title']}". Please review and approve.',
+          'task_id': widget.task['id'],
+          'is_read': false,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+
+      if (mounted) {
+        setState(() => isApproving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Submission approved! Sent to admin for final approval.')),
+        );
+        Navigator.pop(context);
+        widget.onUploadSuccess();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => isApproving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error approving submission: $e')),
+        );
+      }
+    }
+  }
+
+  void _showDisapproveDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disapprove Submission'),
+        content: TextField(
+          onChanged: (value) => disapprovalReason = value,
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Enter reason for disapproval',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _disapproveSubmission();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Disapprove'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _disapproveSubmission() async {
+    try {
+      setState(() => isApproving = true);
+
+      // Update task status back to pending
+      await supabase.from('tasks').update({
+        'status': 'pending',
+        'leader_disapproval_reason': disapprovalReason,
+        'leader_disapproved_at': DateTime.now().toIso8601String(),
+      }).eq('id', widget.task['id']);
+
+      // Get the member who submitted
+      final submitter = submissions.isNotEmpty ? submissions[0]['user_id'] : null;
+      if (submitter != null) {
+        // Create notification for the member
+        await supabase.from('notifications').insert({
+          'user_id': submitter,
+          'type': 'task_disapproved',
+          'title': 'Submission Disapproved: ${widget.task['title']}',
+          'message': 'Your submission was disapproved with reason: $disapprovalReason',
+          'task_id': widget.task['id'],
+          'is_read': false,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      }
+
+      if (mounted) {
+        setState(() => isApproving = false);
+        disapprovalReason = '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Submission disapproved. Member notified.')),
+        );
+        Navigator.pop(context);
+        widget.onUploadSuccess();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => isApproving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error disapproving submission: $e')),
+        );
+      }
+    }
   }
 }
