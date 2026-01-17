@@ -174,36 +174,20 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF6A11CB), Color(0xFF2575FC)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
-              child: Container(
-                padding: const EdgeInsets.all(25),
-                constraints: const BoxConstraints(maxWidth: 400),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      offset: const Offset(0, 6),
-                      blurRadius: 25,
-                      color: Colors.black12.withOpacity(0.1),
-                    )
-                  ],
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                child: _step == 1 ? _buildEmailUI() : (_step == 2 ? _buildOtpUI() : _buildPasswordUI()),
-              ),
+      backgroundColor: const Color(0xFF0F1419),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              constraints: const BoxConstraints(maxWidth: 420),
+              color: const Color(0xFF0F1419),
+              child: _step == 1 
+                ? _buildEmailUI() 
+                : (_step == 2 
+                  ? _buildOtpUI() 
+                  : _buildPasswordUI()),
             ),
           ),
         ),
@@ -214,74 +198,130 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget _buildEmailUI() {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.blueGrey[50],
-          ),
-          child: const Icon(Icons.lock_reset, size: 55, color: Color(0xFF2575FC)),
-        ),
-        const SizedBox(height: 20),
         const Text(
           "Reset Password",
           style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 22,
-              color: Colors.black87),
+            fontWeight: FontWeight.w900,
+            fontSize: 32,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          "Enter your email address to receive a password reset OTP",
+          style: TextStyle(
+            fontSize: 15,
+            color: Colors.grey.shade400,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 28),
+        Text(
+          'Email Address',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Colors.grey.shade300,
+            letterSpacing: 0.5,
+          ),
         ),
         const SizedBox(height: 10),
-        const Text(
-          "Enter your email to receive an OTP.",
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 15, color: Colors.grey),
-        ),
-        const SizedBox(height: 25),
         TextField(
           controller: emailController,
           keyboardType: TextInputType.emailAddress,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+          ),
           decoration: InputDecoration(
-            labelText: "Email",
-            prefixIcon: const Icon(Icons.email_outlined),
+            hintText: "you@example.com",
+            hintStyle: TextStyle(
+              color: Colors.grey.shade600,
+            ),
+            prefixIcon: Icon(
+              Icons.email_outlined,
+              color: Colors.grey.shade500,
+              size: 20,
+            ),
             filled: true,
-            fillColor: Colors.grey[100],
+            fillColor: Colors.white.withOpacity(0.05),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-        const SizedBox(height: 30),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: _loading ? null : _sendOTP,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2575FC),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Colors.white.withOpacity(0.1),
+                width: 1.5,
               ),
-              elevation: 5,
             ),
-            child: _loading
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                    "Send OTP",
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Colors.white.withOpacity(0.1),
+                width: 1.5,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(
+                color: Color(0xFF667EEA),
+                width: 2,
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 15),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text(
-            "Back to Login",
-            style: TextStyle(
-                color: Color(0xFF2575FC),
-                fontWeight: FontWeight.w600),
+        const SizedBox(height: 24),
+        ElevatedButton(
+          onPressed: _loading ? null : _sendOTP,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF667EEA),
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(56),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            elevation: 4,
+            shadowColor:
+                const Color(0xFF667EEA).withOpacity(0.4),
+          ),
+          child: _loading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : const Text(
+                  "Send OTP",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+        ),
+        const SizedBox(height: 18),
+        Center(
+          child: TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+            ),
+            child: const Text(
+              "← Back to Login",
+              style: TextStyle(
+                color: Color(0xFF667EEA),
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
           ),
         ),
       ],
@@ -291,77 +331,128 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget _buildOtpUI() {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.blue[50],
-          ),
-          child: const Icon(Icons.mail, size: 55, color: Colors.blue),
-        ),
-        const SizedBox(height: 20),
         const Text(
           "Verify OTP",
           style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 22,
-              color: Colors.black87),
+            fontWeight: FontWeight.w900,
+            fontSize: 32,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         Text(
           "Enter the 6-digit code sent to $_resetEmail",
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 15, color: Colors.grey),
+          style: TextStyle(
+            fontSize: 15,
+            color: Colors.grey.shade400,
+            height: 1.5,
+          ),
         ),
-        const SizedBox(height: 25),
+        const SizedBox(height: 28),
+        Text(
+          'OTP Code',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Colors.grey.shade300,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 10),
         TextField(
           controller: otpController,
           maxLength: 6,
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 24, letterSpacing: 8),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 8,
+          ),
           decoration: InputDecoration(
             hintText: "000000",
+            hintStyle: TextStyle(
+              color: Colors.grey.shade600,
+            ),
             filled: true,
-            fillColor: Colors.grey[100],
+            fillColor: Colors.white.withOpacity(0.05),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16, vertical: 18),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Colors.white.withOpacity(0.1),
+                width: 1.5,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Colors.white.withOpacity(0.1),
+                width: 1.5,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(
+                color: Color(0xFF667EEA),
+                width: 2,
+              ),
             ),
             counterText: '',
           ),
         ),
-        const SizedBox(height: 30),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: _loading ? null : _verifyOTP,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2575FC),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              elevation: 5,
+        const SizedBox(height: 24),
+        ElevatedButton(
+          onPressed: _loading ? null : _verifyOTP,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF667EEA),
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(56),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: _loading
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                    "Verify OTP",
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+            elevation: 4,
+            shadowColor:
+                const Color(0xFF667EEA).withOpacity(0.4),
           ),
+          child: _loading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : const Text(
+                  "Verify OTP",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
         ),
-        const SizedBox(height: 15),
+        const SizedBox(height: 18),
         TextButton(
           onPressed: _loading ? null : _sendOTP,
+          style: TextButton.styleFrom(
+            padding: EdgeInsets.zero,
+          ),
           child: const Text(
             "Didn't receive OTP? Resend",
             style: TextStyle(
-                color: Color(0xFF2575FC),
-                fontWeight: FontWeight.w600),
+              color: Color(0xFF667EEA),
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
           ),
         ),
       ],
@@ -371,65 +462,114 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget _buildPasswordUI() {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.green[50],
-          ),
-          child: const Icon(Icons.verified, size: 55, color: Colors.green),
-        ),
-        const SizedBox(height: 20),
         const Text(
           "Set New Password",
           style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 22,
-              color: Colors.black87),
+            fontWeight: FontWeight.w900,
+            fontSize: 32,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          "Create a strong password for your account",
+          style: TextStyle(
+            fontSize: 15,
+            color: Colors.grey.shade400,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 28),
+        Text(
+          'New Password',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: Colors.grey.shade300,
+            letterSpacing: 0.5,
+          ),
         ),
         const SizedBox(height: 10),
-        const Text(
-          "Enter your new password",
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 15, color: Colors.grey),
-        ),
-        const SizedBox(height: 25),
         TextField(
           controller: passwordController,
           obscureText: true,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+          ),
           decoration: InputDecoration(
-            labelText: "New Password",
-            prefixIcon: const Icon(Icons.lock_outline),
+            hintText: "Enter new password",
+            hintStyle: TextStyle(
+              color: Colors.grey.shade600,
+            ),
+            prefixIcon: Icon(
+              Icons.lock_outline,
+              color: Colors.grey.shade500,
+              size: 20,
+            ),
             filled: true,
-            fillColor: Colors.grey[100],
+            fillColor: Colors.white.withOpacity(0.05),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16, vertical: 14),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none,
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Colors.white.withOpacity(0.1),
+                width: 1.5,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(
+                color: Colors.white.withOpacity(0.1),
+                width: 1.5,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(
+                color: Color(0xFF667EEA),
+                width: 2,
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 30),
-        SizedBox(
-          width: double.infinity,
-          height: 50,
-          child: ElevatedButton(
-            onPressed: _loading ? null : _resetPassword,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2575FC),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              elevation: 5,
+        const SizedBox(height: 24),
+        ElevatedButton(
+          onPressed: _loading ? null : _resetPassword,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF667EEA),
+            foregroundColor: Colors.white,
+            minimumSize: const Size.fromHeight(56),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: _loading
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text(
-                    "Reset Password",
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+            elevation: 4,
+            shadowColor:
+                const Color(0xFF667EEA).withOpacity(0.4),
           ),
+          child: _loading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : const Text(
+                  "Reset Password",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                  ),
+                ),
         ),
       ],
     );

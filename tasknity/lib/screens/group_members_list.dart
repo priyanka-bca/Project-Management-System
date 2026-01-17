@@ -6,10 +6,10 @@ class GroupMembersList extends StatefulWidget {
   final String groupName;
 
   const GroupMembersList({
-    Key? key,
+    super.key,
     required this.groupId,
     required this.groupName,
-  }) : super(key: key);
+  });
 
   @override
   State<GroupMembersList> createState() => _GroupMembersListState();

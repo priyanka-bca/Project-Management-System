@@ -27,12 +27,42 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
   List<Map<String, dynamic>> submissions = [];
   String disapprovalReason = '';
   bool isApproving = false;
+  String? userRoleInGroup;
 
   @override
   void initState() {
     super.initState();
+    _initializeDialog();
+  }
+
+  Future<void> _initializeDialog() async {
+    await _fetchUserRole();
     _fetchSubmissions();
     _checkDeadlineAndNotify();
+  }
+
+  Future<void> _fetchUserRole() async {
+    try {
+      final currentUser = supabase.auth.currentUser;
+      if (currentUser == null) return;
+
+      final groupId = widget.task['group_id'];
+      final response = await supabase
+          .from('group_members')
+          .select('role')
+          .eq('user_id', currentUser.id)
+          .eq('group_id', groupId)
+          .maybeSingle();
+
+      if (response != null) {
+        setState(() {
+          userRoleInGroup = response['role'];
+        });
+        print('✓ Fetched user role from database: $userRoleInGroup');
+      }
+    } catch (e) {
+      print('✗ Error fetching user role: $e');
+    }
   }
 
   Future<void> _checkDeadlineAndNotify() async {
@@ -312,6 +342,7 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     final dueDate = widget.task['due_date'] != null
         ? DateTime.parse(widget.task['due_date'])
@@ -322,196 +353,346 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
         daysLeft <= 1 &&
         widget.task['document_submitted'] != true;
 
-    return AlertDialog(
-      title: Text(widget.task['title'] ?? 'Task'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Task Description
-            if (widget.task['description'] != null) ...[
-              const Text(
-                'Description:',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(widget.task['description']),
-              const SizedBox(height: 16),
-            ],
-
-            // Status
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Dialog(
+      backgroundColor: const Color(0xFF1A1F2E),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Status: ${submissions.isNotEmpty 
-                      ? (widget.task['status'] == 'completed' ? 'COMPLETED' : 'SUBMITTED')
-                      : 'PENDING'}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  if (dueDate != null && submissions.isEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Due: ${dueDate.toLocal().toString().split(' ')[0]}',
-                      style: TextStyle(
-                        color: isUrgent ? Colors.red : Colors.grey[700],
-                        fontWeight:
-                            isUrgent ? FontWeight.bold : FontWeight.normal,
+                  Expanded(
+                    child: Text(
+                      widget.task['title'] ?? 'Task',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    if (daysLeft != null)
-                      Text(
-                        '$daysLeft days remaining',
-                        style: TextStyle(
-                          color: isUrgent ? Colors.red : Colors.grey[700],
-                          fontWeight:
-                              isUrgent ? FontWeight.bold : FontWeight.normal,
-                        ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[700],
+                        shape: BoxShape.circle,
                       ),
-                  ],
+                      child: const Icon(Icons.close, color: Colors.white, size: 20),
+                    ),
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 20),
 
-            // Submission Status - Show all submissions with delete buttons
-            if (submissions.isNotEmpty)
+              // Task Description
+              if (widget.task['description'] != null && (widget.task['description'] as String).isNotEmpty) ...[
+                Text(
+                  'Description',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[300],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF262F3D),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey[700]!),
+                  ),
+                  child: Text(
+                    widget.task['description'],
+                    style: TextStyle(color: Colors.grey[300], fontSize: 14, height: 1.5),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+
+              // Status and Deadline
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF00D4FF).withOpacity(0.1),
+                      const Color(0xFF00D4FF).withOpacity(0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF00D4FF).withOpacity(0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.check_circle, color: Colors.green),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Documents Submitted (${submissions.length})',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF00D4FF).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(Icons.info_outline, color: Color(0xFF00D4FF), size: 18),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Status: ${submissions.isNotEmpty 
+                            ? (widget.task['status'] == 'completed' ? 'COMPLETED' : 'SUBMITTED')
+                            : 'PENDING'}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            fontSize: 14,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    ...submissions.map((submission) {
-                      final fileName = submission['file_name'] as String? ?? 'Unknown';
-                      final shortName = fileName.length > 50
-                          ? '${fileName.substring(0, 47)}...'
-                          : fileName;
-                      final submittedAt = submission['submitted_at'] as String?;
-                      final date = submittedAt != null
-                          ? DateTime.parse(submittedAt).toLocal().toString().split(' ')[0]
-                          : 'Unknown';
+                    if (dueDate != null && submissions.isEmpty) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today, color: Color(0xFFF59E0B), size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Due: ${dueDate.toLocal().toString().split(' ')[0]}',
+                            style: TextStyle(
+                              color: isUrgent ? const Color(0xFFEF4444) : Colors.grey[300],
+                              fontWeight: isUrgent ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (daysLeft != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            '$daysLeft days remaining',
+                            style: TextStyle(
+                              color: isUrgent ? const Color(0xFFEF4444) : Colors.grey[400],
+                              fontWeight: isUrgent ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
 
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    shortName,
-                                    style: const TextStyle(fontSize: 12),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    'Submitted: $date',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ],
+              // Submission Status
+              if (submissions.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF10B981).withOpacity(0.1),
+                        const Color(0xFF10B981).withOpacity(0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 18),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Documents Submitted (${submissions.length})',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                                fontSize: 14,
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red, size: 18),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              onPressed: () {
-                                // Show confirmation dialog
-                                showDialog(
-                                  context: context,
-                                  builder: (ctx) => AlertDialog(
-                                    title: const Text('Delete File?'),
-                                    content: const Text(
-                                      'Are you sure you want to delete this file?',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(ctx),
-                                        child: const Text('Cancel'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ...submissions.map((submission) {
+                        final fileName = submission['file_name'] as String? ?? 'Unknown';
+                        final shortName = fileName.length > 40
+                            ? '${fileName.substring(0, 37)}...'
+                            : fileName;
+                        final submittedAt = submission['submitted_at'] as String?;
+                        final date = submittedAt != null
+                            ? DateTime.parse(submittedAt).toLocal().toString().split(' ')[0]
+                            : 'Unknown';
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF262F3D),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[700]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Icon(Icons.description, color: Color(0xFF10B981), size: 14),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        shortName,
+                                        style: const TextStyle(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w500),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                      ElevatedButton(
-                                        onPressed: () {
-                                          Navigator.pop(ctx);
-                                          _deleteSubmission(submission['id']);
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.red,
+                                      Text(
+                                        'Submitted: $date',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey[500],
                                         ),
-                                        child: const Text('Delete'),
                                       ),
                                     ],
                                   ),
-                                );
-                              },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444), size: 18),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () {
+                                    // Show confirmation dialog
+                                    showDialog(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Delete File?'),
+                                        content: const Text(
+                                          'Are you sure you want to delete this file?',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(ctx),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () {
+                                              Navigator.pop(ctx);
+                                              _deleteSubmission(submission['id']);
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.red,
+                                            ),
+                                            child: const Text('Delete'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  ),
                 ),
-              )
-            else
+              ]
+            else ...[
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFFF59E0B).withOpacity(0.1),
+                      const Color(0xFFF59E0B).withOpacity(0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.pending, color: Colors.orange),
-                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 18),
+                    ),
+                    const SizedBox(width: 10),
                     const Expanded(
                       child: Text(
                         'No Documents Submitted',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-            const SizedBox(height: 16),
+            ],
+            const SizedBox(height: 20),
 
-            // Upload Progress or Button (only for members, not leaders)
-            if (isUploading)
-              const Column(
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 8),
-                  Text('Uploading...'),
-                ],
-              )
-            else if (widget.currentUserRole == 'leader')
-              // Leader view: Download and approve/disapprove buttons
+            // Upload Progress or Button
+            if (isUploading) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF262F3D),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey[700]!),
+                ),
+                child: Column(
+                  children: [
+                    const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation(Color(0xFF00D4FF)),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Uploading...',
+                      style: TextStyle(color: Colors.grey[300]),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (userRoleInGroup?.toLowerCase() == 'leader' || userRoleInGroup?.toLowerCase() == 'admin') ...[
+              // Leader view: Download Files button ONLY (no upload for leaders)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -519,62 +700,39 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
                     ElevatedButton.icon(
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Download functionality coming soon')),
+                          const SnackBar(
+                            content: Text('Download functionality coming soon'),
+                            backgroundColor: Color(0xFF00D4FF),
+                          ),
                         );
                       },
                       icon: const Icon(Icons.download),
                       label: const Text('Download Files'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
+                        backgroundColor: const Color(0xFF00D4FF),
+                        foregroundColor: const Color(0xFF0F1419),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     )
                   else
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
+                        color: const Color(0xFF262F3D),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.grey[700]!),
                       ),
                       child: const Text(
                         'No documents submitted yet by the member',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.orange),
+                        style: TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.w500),
                       ),
                     ),
-                  const SizedBox(height: 8),
-                  if (submissions.isNotEmpty && widget.task['status'] != 'completed')
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: isApproving ? null : _approveSubmission,
-                            icon: const Icon(Icons.check_circle),
-                            label: const Text('Approve'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: isApproving ? null : _showDisapproveDialog,
-                            icon: const Icon(Icons.cancel),
-                            label: const Text('Disapprove'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
                 ],
-              )
-            else
-              // Member view: Upload button
+              ),
+            ] else if (userRoleInGroup?.toLowerCase() == 'member') ...[
+              // Member view: Upload document button ONLY (no download for members)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -583,31 +741,53 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
                     icon: const Icon(Icons.upload_file),
                     label: const Text('Upload Document'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    onPressed: _showReportDialog,
-                    icon: const Icon(Icons.report_problem),
-                    label: const Text('Report Issue'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
+                      backgroundColor: const Color(0xFF00D4FF),
+                      foregroundColor: const Color(0xFF0F1419),
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                 ],
               ),
-          ],
+            ] else ...[
+              // Default: show member view as fallback
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _uploadDocument,
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Upload Document'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00D4FF),
+                      foregroundColor: const Color(0xFF0F1419),
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text(
+                    'Close',
+                    style: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
+            ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
-        ),
-      ],
     );
   }
 

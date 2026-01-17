@@ -108,9 +108,28 @@ class _LeaderDashboardState extends State<LeaderDashboard> {
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
-            const Text(
-              "Your Tasks",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "Your Tasks",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const CreateTaskScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text("Add Task"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueGrey,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
 
