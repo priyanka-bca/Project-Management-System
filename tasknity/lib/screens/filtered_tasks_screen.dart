@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'task_detail_dialog.dart';
-import 'leader/create_task.dart';
 
 class FilteredTasksScreen extends StatefulWidget {
   final String groupId;

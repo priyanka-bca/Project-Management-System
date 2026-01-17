@@ -78,11 +78,41 @@ class _GroupDashboardState extends State<GroupDashboard> {
       }
       
       // Determine which role to use for fetching groups
-      String roleToUse = role ?? 'member'; // Default to member if no role saved
+      // First, check if there's a saved preference
       final savedRole = prefs.getString('selectedRole');
-      if (savedRole != null && ['leader', 'member'].contains(savedRole)) {
+      
+      // Fetch which roles the user actually has in any group
+      List<String> availableRoles = [];
+      try {
+        final userGroupRoles = await supabase
+            .from('group_members')
+            .select('role')
+            .eq('user_id', user.id);
+        
+        final uniqueRoles = <String>{};
+        for (var member in userGroupRoles) {
+          final roleStr = member['role']?.toString();
+          if (roleStr != null && roleStr.isNotEmpty) {
+            uniqueRoles.add(roleStr.toLowerCase());
+          }
+        }
+        availableRoles = uniqueRoles.toList();
+        print('Available roles for user: $availableRoles');
+      } catch (e) {
+        print('Error fetching available roles: $e');
+      }
+
+      // Choose roleToUse based on: saved preference > available roles > default to member
+      String roleToUse = 'member';
+      
+      if (savedRole != null && ['leader', 'member'].contains(savedRole) && availableRoles.contains(savedRole)) {
+        // Saved role exists and user has it
         roleToUse = savedRole;
-        print('Restored selectedRole from preferences: $savedRole');
+        print('Using saved role: $roleToUse');
+      } else if (availableRoles.isNotEmpty) {
+        // Use first available role
+        roleToUse = availableRoles.first;
+        print('Using available role: $roleToUse');
       }
 
       if (!mounted) return;
@@ -647,7 +677,7 @@ class _GroupDashboardState extends State<GroupDashboard> {
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: selectedMemberId,
+                  initialValue: selectedMemberId,
                   style: const TextStyle(color: Colors.white),
                   dropdownColor: const Color(0xFF262F3D),
                   decoration: InputDecoration(

@@ -624,7 +624,7 @@ class _TaskDetailDialogState extends State<TaskDetailDialog> {
                             ),
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ),
                 ),
