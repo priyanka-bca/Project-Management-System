@@ -15,6 +15,7 @@ export default function GroupDetails() {
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [taskFilter, setTaskFilter] = useState("all"); // 'all', 'completed', 'pending', 'overdue'
 
   /* TASK MODAL */
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -93,8 +94,41 @@ export default function GroupDetails() {
   };
 
   /* ---------------- TASK FILTERS ---------------- */
+  const getFilteredTasks = () => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    return tasks.filter((task) => {
+      switch (taskFilter) {
+        case "completed":
+          return task.status === "completed";
+        case "pending": {
+          const dueDate = task.due_date ? new Date(task.due_date) : null;
+          dueDate?.setHours(0, 0, 0, 0);
+          return task.status !== "completed" && (!dueDate || dueDate >= now);
+        }
+        case "overdue": {
+          const dueDate = task.due_date ? new Date(task.due_date) : null;
+          dueDate?.setHours(0, 0, 0, 0);
+          return task.status !== "completed" && dueDate && dueDate < now;
+        }
+        default: // 'all'
+          return true;
+      }
+    });
+  };
+
   const completedTasks = tasks.filter((t) => t.status === "completed");
   const pendingTasks = tasks.filter((t) => t.status === "pending");
+  const overdueTasks = tasks.filter((t) => {
+    if (t.status === "completed") return false;
+    const dueDate = t.due_date ? new Date(t.due_date) : null;
+    if (!dueDate) return false;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate < now;
+  });
 
   /* ---------------- CHANGE MEMBER ROLE ---------------- */
   const handleChangeRole = async (memberId, currentRole) => {
@@ -190,9 +224,10 @@ export default function GroupDetails() {
       <main className="max-w-7xl mx-auto px-6 space-y-10">
 
         {/* STATS */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <section className="grid grid-cols-1 sm:grid-cols-4 gap-6">
           <StatCard label="Total Tasks" value={tasks.length} color="blue" />
           <StatCard label="Pending" value={pendingTasks.length} color="yellow" />
+          <StatCard label="Overdue" value={overdueTasks.length} color="red" />
           <StatCard label="Completed" value={completedTasks.length} color="green" />
         </section>
 
@@ -286,8 +321,40 @@ export default function GroupDetails() {
 
         {/* TASKS */}
         <section className="bg-white rounded-2xl border shadow-sm p-6">
-          <h2 className="text-lg font-medium text-slate-800 mb-4">Tasks</h2>
-          <TaskList groupId={groupId} />
+          <div className="mb-4 space-y-4">
+            <h2 className="text-lg font-medium text-slate-800">Tasks</h2>
+            {/* Filter Buttons */}
+            <div className="flex flex-wrap gap-3">
+              {[
+                { value: "all", label: "All Tasks", icon: "📋" },
+                { value: "pending", label: "Pending", icon: "⏳" },
+                { value: "overdue", label: "Overdue", icon: "⚠️" },
+                { value: "completed", label: "Completed", icon: "✓" },
+              ].map((filter) => (
+                <button
+                  key={filter.value}
+                  onClick={() => setTaskFilter(filter.value)}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition ${
+                    taskFilter === filter.value
+                      ? "bg-indigo-600 text-white shadow-md"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  {filter.icon} {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {getFilteredTasks().length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-slate-500 text-sm">
+                No {taskFilter !== "all" ? taskFilter : ""} tasks found
+              </p>
+            </div>
+          ) : (
+            <TaskList groupId={groupId} tasks={getFilteredTasks()} />
+          )}
         </section>
 
         {/* NOTIFICATIONS */}
@@ -371,6 +438,7 @@ function StatCard({ label, value, color }) {
     blue: "bg-blue-100 text-blue-700",
     yellow: "bg-yellow-100 text-yellow-700",
     green: "bg-green-100 text-green-700",
+    red: "bg-red-100 text-red-700",
   };
 
   return (

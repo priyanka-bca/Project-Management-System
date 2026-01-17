@@ -9,42 +9,95 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sessionRestored, setSessionRestored] = useState(false);
 
-  // Load session
+  // Initialize auth on mount - restore session first
   useEffect(() => {
-    const load = async () => {
-      const { data } = await supabase.auth.getSession();
-      setUser(data.session?.user ?? null);
-      setLoading(false);
+    let isMounted = true;
+
+    const restoreSession = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (isMounted) {
+          if (data?.session?.user) {
+            console.log("Session restored from storage");
+            setUser(data.session.user);
+          } else {
+            console.log("No session found in storage");
+            setUser(null);
+            setLoading(false); // No session, stop loading immediately
+          }
+          setSessionRestored(true);
+        }
+      } catch (err) {
+        console.error("Session restore error:", err);
+        if (isMounted) {
+          setUser(null);
+          setLoading(false);
+          setSessionRestored(true);
+        }
+      }
     };
 
-    load();
+    restoreSession();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
+    // Set up listener for ongoing changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log("Auth state changed:", event, session?.user?.id);
+        if (isMounted) {
+          setUser(session?.user || null);
+          setSessionRestored(true);
+        }
       }
     );
 
-    return () => listener.subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription?.unsubscribe();
+    };
   }, []);
 
-  // Load role
+  // Load role when user changes (only after session restored)
   useEffect(() => {
+    if (!sessionRestored) {
+      return; // Wait for session restoration first
+    }
+
     if (!user) {
       setRole(null);
+      setLoading(false); // Session restored, no user
       return;
     }
 
-    supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single()
-      .then(({ data }) => {
-        setRole(data?.role ?? null);
-      });
-  }, [user]);
+    // User exists, keep loading until role is fetched
+    const loadRole = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+
+        if (error) {
+          console.error("Error loading role:", error);
+          setRole(null);
+        } else {
+          console.log("Role loaded:", data?.role);
+          setRole(data?.role ?? null);
+        }
+      } catch (err) {
+        console.error("Exception loading role:", err);
+        setRole(null);
+      } finally {
+        // Role is loaded, finish loading
+        console.log("Auth fully initialized");
+        setLoading(false);
+      }
+    };
+
+    loadRole();
+  }, [user, sessionRestored]);
 
   // SIGNUP (create auth user + OTP)
   const signUp = async (email, password) => {

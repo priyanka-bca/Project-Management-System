@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'task_detail_dialog.dart';
 import 'filtered_tasks_screen.dart';
+import 'group_members_list.dart';
 
 class GroupDashboard extends StatefulWidget {
   const GroupDashboard({super.key});
@@ -20,6 +21,7 @@ class _GroupDashboardState extends State<GroupDashboard> {
   List<Map<String, dynamic>> groups = [];
   List<Map<String, dynamic>> tasks = [];
   List<Map<String, dynamic>> groupMembers = [];
+  int totalMembersCount = 0; // Total count including leaders
   bool loading = true;
   String taskFilter = 'all'; // Filter: all, completed, pending, overdue
 
@@ -47,6 +49,15 @@ class _GroupDashboardState extends State<GroupDashboard> {
       final role = prefs.getString('role');
 
       print('User ID: ${user.id}, Role: $role');
+      
+      // Restore user's selected role preference
+      final savedRole = prefs.getString('selectedRole');
+      if (savedRole != null && ['leader', 'member'].contains(savedRole)) {
+        setState(() {
+          selectedRole = savedRole;
+        });
+        print('Restored selectedRole: $selectedRole');
+      }
 
       // Fetch user's groups
       List<dynamic> groupMemberships = [];
@@ -135,7 +146,15 @@ class _GroupDashboardState extends State<GroupDashboard> {
       String actualRole = memberData?['role'] ?? 'member';
       print('Actual group role: $actualRole');
 
-      // Fetch all members in this group
+      // Fetch total count of all members in this group (for display)
+      final allGroupMembers = await supabase
+          .from('group_members')
+          .select('user_id, role')
+          .eq('group_id', selectedGroupId!);
+      
+      int allMembersCount = allGroupMembers.length;
+
+      // Fetch members list (all members including leaders)
       final membersData = await supabase
           .from('group_members')
           .select('user_id, role')
@@ -163,8 +182,10 @@ class _GroupDashboardState extends State<GroupDashboard> {
 
       setState(() {
         groupRole = actualRole;
-        selectedRole = actualRole;
+        // Don't override selectedRole here - keep the user's view preference
+        // selectedRole is controlled by the "View As" toggle
         groupMembers = membersList;
+        totalMembersCount = allMembersCount;
       });
     } catch (e) {
       print('Error fetching group role/members: $e');
@@ -215,6 +236,11 @@ class _GroupDashboardState extends State<GroupDashboard> {
       selectedGroupId = null;
     });
     
+    // Save selected role to preferences so it persists on app restart
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('selectedRole', newRole);
+    });
+    
     // Load groups for the selected role
     _loadGroupsForRole(newRole).then((_) {
       // If groups available, select first one and fetch its data
@@ -233,18 +259,20 @@ class _GroupDashboardState extends State<GroupDashboard> {
       List<Map<String, dynamic>> fetchedGroups = [];
 
       if (role == 'leader') {
-        // Get groups where user is the leader
-        final leaderGroups = await supabase
-            .from('groups')
-            .select('id')
-            .eq('leader_id', user.id);
+        // Get groups where user is a leader (from group_members table)
+        final leaderMemberships = await supabase
+            .from('group_members')
+            .select('group_id')
+            .eq('user_id', user.id)
+            .eq('role', 'leader');
 
-        for (var group in leaderGroups) {
+        for (var membership in leaderMemberships) {
+          final groupId = membership['group_id'];
           try {
             final groupData = await supabase
                 .from('groups')
                 .select('id, name, project_name')
-                .eq('id', group['id'])
+                .eq('id', groupId)
                 .maybeSingle();
 
             if (groupData != null) {
@@ -259,13 +287,14 @@ class _GroupDashboardState extends State<GroupDashboard> {
           }
         }
       } else {
-        // Get groups where user is a member (existing logic)
+        // Get groups where user is a member (only role='member')
         List<dynamic> groupMemberships = [];
         try {
           groupMemberships = await supabase
               .from('group_members')
               .select('group_id')
-              .eq('user_id', user.id);
+              .eq('user_id', user.id)
+              .eq('role', 'member');
         } catch (e) {
           print('Error fetching group_members: $e');
         }
@@ -608,11 +637,13 @@ class _GroupDashboardState extends State<GroupDashboard> {
     return Scaffold(
       backgroundColor: const Color(0xFF1A1F2E),
       appBar: AppBar(
-        title: const Text(
-          'Group Dashboard',
-          style: TextStyle(
+        title: Text(
+          'Dashboard',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
             fontWeight: FontWeight.w800,
-            fontSize: 28,
+            fontSize: 22,
             letterSpacing: 0.5,
             color: Colors.white,
           ),
@@ -624,18 +655,21 @@ class _GroupDashboardState extends State<GroupDashboard> {
         toolbarHeight: 80,
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(right: 8),
             child: Center(
               child: GestureDetector(
                 onTap: () {
                   // Profile section (for future expansion)
                 },
-                child: _buildAppBarProfile(),
+                child: SizedBox(
+                  width: 110,
+                  child: _buildAppBarProfile(),
+                ),
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.only(right: 8),
             child: Center(
               child: IconButton(
                 icon: const Icon(Icons.logout, size: 28),
@@ -675,18 +709,7 @@ class _GroupDashboardState extends State<GroupDashboard> {
                     const SizedBox(height: 24),
                   ],
                   // Groups Title
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16),
-                    child: Text(
-                      'Your Groups',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ),
+                  // Removed - no label needed
                   const SizedBox(height: 12),
                   // Show group selector or empty state
                   if (groups.isEmpty)
@@ -745,8 +768,8 @@ class _GroupDashboardState extends State<GroupDashboard> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 48,
-          height: 48,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF00D4FF), Color(0xFFD946EF)],
@@ -759,37 +782,26 @@ class _GroupDashboardState extends State<GroupDashboard> {
             child: Text(
               userName[0].toUpperCase(),
               style: const TextStyle(
-                fontSize: 20,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
             ),
           ),
         ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Profile',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[400],
-                letterSpacing: 0.2,
-              ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            userName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              letterSpacing: 0.2,
             ),
-            Text(
-              userName,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ],
+          ),
         ),
       ],
     );
@@ -798,11 +810,8 @@ class _GroupDashboardState extends State<GroupDashboard> {
   // Unused method _buildProfileSection() removed
 
   Widget _buildGroupSelector() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final horizontalPadding = screenWidth * 0.05; // 5% padding on each side
-    
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      margin: const EdgeInsets.only(left: 0, right: 0),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [const Color(0xFF262F3D), const Color(0xFF1F2734)],
@@ -817,7 +826,7 @@ class _GroupDashboardState extends State<GroupDashboard> {
             offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(color: const Color(0xFF00D4FF).withOpacity(0.2), width: 1),
+        border: Border.all(color: const Color(0xFF00D4FF).withOpacity(0.3), width: 1.5),
       ),
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -898,7 +907,7 @@ class _GroupDashboardState extends State<GroupDashboard> {
 
   Widget _buildRoleSwitcher() {
     return Container(
-      margin: const EdgeInsets.only(left: 32, right: 16),
+      margin: const EdgeInsets.only(left: 0, right: 0),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [const Color(0xFF262F3D), const Color(0xFF1F2734)],
@@ -913,7 +922,7 @@ class _GroupDashboardState extends State<GroupDashboard> {
             offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(color: const Color(0xFF00D4FF).withOpacity(0.2), width: 1),
+        border: Border.all(color: const Color(0xFF00D4FF).withOpacity(0.3), width: 1.5),
       ),
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -925,7 +934,7 @@ class _GroupDashboardState extends State<GroupDashboard> {
               const Icon(Icons.security, size: 22, color: Color(0xFF00D4FF)),
               const SizedBox(width: 12),
               const Text(
-                'View As',
+                'Select your role',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -986,8 +995,70 @@ class _GroupDashboardState extends State<GroupDashboard> {
   }
 
   Widget _buildMembersSection() {
+    return GestureDetector(
+      onTap: () {
+        if (selectedGroupId != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => GroupMembersList(
+                groupId: selectedGroupId!,
+                groupName: groups.firstWhere(
+                  (g) => g['id'] == selectedGroupId,
+                  orElse: () => {'name': 'Group'},
+                )['name'] ?? 'Group Members',
+              ),
+            ),
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(left: 0, right: 0),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [const Color(0xFF262F3D), const Color(0xFF1F2734)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+          border: Border.all(color: const Color(0xFF00D4FF).withOpacity(0.3), width: 1.5),
+        ),
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.people, size: 22, color: Color(0xFF00D4FF)),
+                const SizedBox(width: 12),
+                Text(
+                  'Group Members ($totalMembersCount)',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatsSection() {
     return Container(
-      margin: const EdgeInsets.only(left: 32, right: 16),
+      margin: const EdgeInsets.only(left: 0, right: 0),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [const Color(0xFF262F3D), const Color(0xFF1F2734)],
@@ -1002,114 +1073,36 @@ class _GroupDashboardState extends State<GroupDashboard> {
             offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(color: const Color(0xFF00D4FF).withOpacity(0.2), width: 1),
+        border: Border.all(color: const Color(0xFF00D4FF).withOpacity(0.3), width: 1.5),
       ),
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Text(
+            'Tasks',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 14),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.85,
             children: [
-              const Icon(Icons.people, size: 22, color: Color(0xFF00D4FF)),
-              const SizedBox(width: 12),
-              Text(
-                'Group Members (${groupMembers.length})',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  letterSpacing: 0.3,
-                ),
-              ),
+              _buildStatCard('Total', total.toString(), const Color(0xFF00D4FF), Icons.assignment, 'all'),
+              _buildStatCard('Completed', completed.toString(), const Color(0xFF10B981), Icons.check_circle, 'completed'),
+              _buildStatCard('Pending', pending.toString(), const Color(0xFFF59E0B), Icons.schedule, 'pending'),
+              _buildStatCard('Overdue', overdue.toString(), const Color(0xFFEF4444), Icons.error_outline, 'overdue'),
             ],
           ),
-          const SizedBox(height: 16),
-          ...groupMembers.map((member) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1F2E),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF00D4FF).withOpacity(0.15), width: 1),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          member['name'] ?? 'Unknown',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          member['email'] ?? '',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[400],
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: member['group_role'] == 'leader'
-                          ? const Color(0xFFD946EF).withOpacity(0.2)
-                          : const Color(0xFF00D4FF).withOpacity(0.2),
-                      border: Border.all(
-                        color: member['group_role'] == 'leader'
-                            ? const Color(0xFFD946EF).withOpacity(0.5)
-                            : const Color(0xFF00D4FF).withOpacity(0.5),
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      member['group_role']?.toUpperCase() ?? 'MEMBER',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: member['group_role'] == 'leader'
-                            ? const Color(0xFFD946EF)
-                            : const Color(0xFF00D4FF),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatsSection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.75,
-        children: [
-          _buildStatCard('Total', total.toString(), const Color(0xFF00D4FF), Icons.assignment, 'all'),
-          _buildStatCard('Completed', completed.toString(), const Color(0xFF10B981), Icons.check_circle, 'completed'),
-          _buildStatCard('Pending', pending.toString(), const Color(0xFFF59E0B), Icons.schedule, 'pending'),
-          _buildStatCard('Overdue', overdue.toString(), const Color(0xFFEF4444), Icons.error_outline, 'overdue'),
         ],
       ),
     );
@@ -1260,10 +1253,10 @@ class _GroupDashboardState extends State<GroupDashboard> {
               contentPadding: const EdgeInsets.all(14),
               title: Text(
                 task['title'] ?? 'Untitled',
-                style: TextStyle(
-                  fontWeight: isUrgent ? FontWeight.w700 : FontWeight.w600,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
                   fontSize: 15,
-                  color: isUrgent ? const Color(0xFFF59E0B) : Colors.white,
+                  color: Colors.white,
                 ),
               ),
               subtitle: Padding(
@@ -1382,60 +1375,66 @@ class _GroupDashboardState extends State<GroupDashboard> {
         );
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             colors: [Color(0xFF262F3D), Color(0xFF1F2734)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: color.withOpacity(0.3),
-            width: 1.5,
+            color: color.withOpacity(0.4),
+            width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.25),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+              color: color.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+              spreadRadius: 1,
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             )
           ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
+                color: color.withOpacity(0.15),
                 shape: BoxShape.circle,
-                border: Border.all(color: color.withOpacity(0.4), width: 1),
+                border: Border.all(color: color.withOpacity(0.5), width: 1.5),
               ),
-              child: Icon(icon, color: color, size: 24),
+              child: Icon(icon, color: color, size: 20),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
             Text(
               value,
               style: TextStyle(
                 color: color,
-                fontSize: 26,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
                 letterSpacing: -0.5,
               ),
             ),
-            const SizedBox(height: 6),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.3,
               ),
             ),
           ],

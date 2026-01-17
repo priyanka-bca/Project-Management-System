@@ -1,16 +1,25 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 
-export default function TaskList({ groupId }) {
+export default function TaskList({ groupId, tasks: externalTasks }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadTasks();
-  }, [groupId]);
+    if (externalTasks && externalTasks.length > 0) {
+      // Use externally provided tasks (from filtering)
+      setTasks(externalTasks);
+      setLoading(false);
+    } else if (groupId) {
+      // Load tasks from database if not provided externally
+      loadTasks();
+    }
+  }, [groupId, externalTasks]);
 
   const loadTasks = async () => {
-    const { data, error } = await supabase
+    if (!groupId) return;
+    
+    const { data: tasksData, error } = await supabase
       .from("tasks")
       .select(`
         id,
@@ -19,14 +28,46 @@ export default function TaskList({ groupId }) {
         due_date,
         status,
         document_submitted,
-        profiles (
-          name
-        )
+        assigned_to
       `)
       .eq("group_id", groupId)
       .order("issued_at", { ascending: false });
 
-    if (!error) setTasks(data || []);
+    if (error) {
+      console.error("Error loading tasks:", error);
+      setLoading(false);
+      return;
+    }
+
+    // Now fetch profile info for assigned_to users
+    if (tasksData && tasksData.length > 0) {
+      const userIds = [...new Set(tasksData.map(t => t.assigned_to).filter(Boolean))];
+      
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", userIds);
+
+        const profileMap = {};
+        profiles?.forEach(p => {
+          profileMap[p.id] = p.full_name;
+        });
+
+        // Merge profile data into tasks
+        const enrichedTasks = tasksData.map(task => ({
+          ...task,
+          profiles: task.assigned_to ? { full_name: profileMap[task.assigned_to] } : null
+        }));
+
+        setTasks(enrichedTasks);
+      } else {
+        setTasks(tasksData);
+      }
+    } else {
+      setTasks(tasksData || []);
+    }
+
     setLoading(false);
   };
 
@@ -66,6 +107,31 @@ export default function TaskList({ groupId }) {
     return task.document_submitted ? "✓ Yes" : "✗ No";
   };
 
+  const getDueDateColor = (task) => {
+    if (!task.due_date) return "text-slate-500";
+    
+    const dueDate = new Date(task.due_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dueDate.setHours(0, 0, 0, 0);
+    
+    if (dueDate < today && task.status !== "completed") {
+      return "text-red-600 font-semibold"; // Overdue - red
+    }
+    return "text-slate-600";
+  };
+
+  const isOverdue = (task) => {
+    if (!task.due_date) return false;
+    
+    const dueDate = new Date(task.due_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dueDate.setHours(0, 0, 0, 0);
+    
+    return dueDate < today && task.status !== "completed";
+  };
+
   if (loading) return <p className="text-gray-500">Loading tasks...</p>;
 
   if (tasks.length === 0) {
@@ -88,14 +154,21 @@ export default function TaskList({ groupId }) {
 
         <tbody>
           {tasks.map((task) => (
-            <tr key={task.id} className="hover:bg-slate-50">
+            <tr key={task.id} className={`hover:bg-slate-50 ${isOverdue(task) ? "bg-red-50" : ""}`}>
               <td className="p-3 border text-slate-800">{task.title}</td>
-              <td className="p-3 border text-slate-600">{task.profiles?.name || "Unassigned"}</td>
+              <td className="p-3 border text-slate-600">{task.profiles?.full_name || "Unassigned"}</td>
               <td className="p-3 border text-slate-600">
                 {new Date(task.issued_at).toLocaleDateString()}
               </td>
-              <td className="p-3 border text-slate-600">
-                {new Date(task.due_date).toLocaleDateString()}
+              <td className={`p-3 border ${getDueDateColor(task)}`}>
+                <div className="flex items-center gap-2">
+                  {new Date(task.due_date).toLocaleDateString()}
+                  {isOverdue(task) && (
+                    <span className="inline-block px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded">
+                      Overdue
+                    </span>
+                  )}
+                </div>
               </td>
               <td className="p-3 border">
                 {getStatusBadge(task)}

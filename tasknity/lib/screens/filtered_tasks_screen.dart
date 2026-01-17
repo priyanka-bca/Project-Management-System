@@ -126,12 +126,20 @@ class _FilteredTasksScreenState extends State<FilteredTasksScreen> {
     final filteredTasks = _getFilteredTasks();
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0F1419),
       appBar: AppBar(
-        title: Text(_getFilterTitle()),
+        title: Text(
+          _getFilterTitle(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: const Color(0xFF1F2734),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -204,8 +212,9 @@ class _FilteredTasksScreenState extends State<FilteredTasksScreen> {
                                 task['title'] ?? 'Untitled',
                                 style: const TextStyle(
                                   fontSize: 16,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.bold,
                                   color: Colors.white,
+                                  decoration: TextDecoration.none,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -284,7 +293,6 @@ class _FilteredTasksScreenState extends State<FilteredTasksScreen> {
                 );
               },
             ),
-      backgroundColor: const Color(0xFF0F1419),
     );
   }
 
